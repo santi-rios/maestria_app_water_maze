@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.4.549">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Entropia - Cálculo de Entropia en el Laberinto Acuático de Morris</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<meta name="shinylive:serviceworker_dir" content=".">
+<script src="site_libs/quarto-contrib/shinylive-0.2.3/shinylive/load-shinylive-sw.js" type="module"></script>
+<script src="site_libs/quarto-contrib/shinylive-0.2.3/shinylive/run-python-blocks.js" type="module"></script>
+<link href="site_libs/quarto-contrib/shinylive-0.2.3/shinylive/shinylive.css" rel="stylesheet">
+<link href="site_libs/quarto-contrib/shinylive-quarto-css/shinylive-quarto.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-search-results"></div>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Cálculo de Entropia en el Laberinto Acuático de Morris</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="cálculo" class="level2 unnumbered">
+<h2 class="unnumbered anchored" data-anchor-id="cálculo">Cálculo</h2>
+<p>Coordenadas de annulus original: (220, 77) Coordenadas de annulus Reversa: (130, 169)</p>
+<pre class="shinylive-r" data-engine="r"><code>#| standalone: true
+#| viewerHeight: 600
+library(shiny)
+library(janitor)  # For clean_names
+library(dplyr)    # For data manipulation
+library(car)      # For the ellipse function
+
+# Define UI for app to upload and analyze CSV file
+ui &lt;- fluidPage(
+  titlePanel("Cálculo de entropía"),
+  sidebarLayout(
+    sidebarPanel(
+      # Input: Select a CSV file
+      fileInput("file1", "Subir coordenadas", accept = ".csv"),
+      
+      # Numeric input for defining plat_x and plat_y
+      numericInput("plat_x", "Coordenadas de plataforma en X", value = 220),  # Default value set to 220
+      numericInput("plat_y", "Coordenadas de plataforma en Y", value = 77),   # Default value set to 77
+      
+      tags$hr(),
+      
+      # Button to calculate entropy
+      actionButton("calc_entropy", "Calcular")
+    ),
+    mainPanel(
+      tableOutput("entropy_table"),
+      plotOutput("plot")  # Output plot
+    )
+  )
+)
+
+# Define server logic
+server &lt;- function(input, output, session) {
+  observeEvent(input$calc_entropy, {
+    req(input$file1)  # Ensure that a file is uploaded before proceeding
+    
+    # Read the CSV file
+    data &lt;- read.csv(input$file1$datapath)
+    # Clean column names with janitor to ensure consistency
+    data &lt;- janitor::clean_names(data)
+    # Rename the first three columns to 'time', 'X', 'Y'
+    names(data)[1:3] &lt;- c("time", "X", "Y")
+    
+    # Use input values for plat_x and plat_y
+    plat_x &lt;- input$plat_x
+    plat_y &lt;- input$plat_y
+
+    Xraw &lt;- as.numeric(data$X)
+    Yraw &lt;- as.numeric(data$Y)
+
+    d_x &lt;- Xraw - plat_x
+    d_y &lt;- Yraw - plat_y
+
+    dist2 &lt;- d_x^2 + d_y^2
+
+    w &lt;- 1
+    sw &lt;- sum(w)
+
+    xm &lt;- mean(w * d_x) / sw
+    ym &lt;- mean(w * d_y) / sw
+    xxm &lt;- mean(w * d_x * d_x) / sw
+    yym &lt;- mean(w * d_y * d_y) / sw
+    xym &lt;- mean(w * d_x * d_y) / sw
+
+    Sig &lt;- matrix(c(xxm - xm^2, xym - xm * ym,
+                    xym - xm * ym, yym - ym^2), nrow=2)
+
+    eig_val &lt;- eigen(Sig)$values
+    var_xy2 &lt;- eig_val[1] * eig_val[2]
+
+    mdist2 &lt;- mean(w * dist2) / sw
+
+    entropy &lt;- log(mdist2) + 0.5 * log(var_xy2)
+
+    # Create a data frame for output
+    entropy_data &lt;- data.frame(Entropia = entropy)
+
+    # Output the data frame
+    output$entropy_table &lt;- renderTable({
+      entropy_data
+    })
+
+    # Output the plot
+    output$plot &lt;- renderPlot({
+      # Define limits with a buffer
+      x_lim_buffer &lt;- 100
+      y_lim_buffer &lt;- 100
+      plot(Xraw, Yraw, xlim=c(min(Xraw) - x_lim_buffer, max(Xraw) + x_lim_buffer), ylim=c(min(Yraw) - y_lim_buffer, max(Yraw) + y_lim_buffer), xlab="X", ylab="Y", main="Coordenadas del ratón alrededor del annulus blanco")
+      points(plat_x, plat_y, col="red", pch=19)  # Reference point
+      segments(Xraw, Yraw, plat_x, plat_y, col="grey")
+      text(plat_x, plat_y, labels="Annulus", pos=4, col="red")
+
+      # Draw error ellipse and principal axes
+      data_points &lt;- data.frame(Xraw, Yraw)
+      ellipse_center &lt;- c(plat_x, plat_y)
+      cov_matrix &lt;- cov(data_points)
+
+      eig &lt;- eigen(cov_matrix)
+      eig_vec &lt;- eig$vectors
+      eig_val &lt;- eig$values
+
+      # Scale eigenvectors for plotting
+      scale_factor &lt;- 2
+      segments(plat_x, plat_y, plat_x + scale_factor * eig_vec[1,1] * sqrt(eig_val[1]), plat_y + scale_factor * eig_vec[2,1] * sqrt(eig_val[1]), col="purple")
+      segments(plat_x, plat_y, plat_x + scale_factor * eig_vec[1,2] * sqrt(eig_val[2]), plat_y + scale_factor * eig_vec[2,2] * sqrt(eig_val[2]), col="purple")
+    })
+  })
+}
+
+
+# Create Shiny app
+shinyApp(ui, server)
+
+
+</code></pre>
+</section>
+<section id="explicación" class="level2 unnumbered">
+<h2 class="unnumbered anchored" data-anchor-id="explicación">Explicación</h2>
+<p>El cálculo de entropía está basado en la propuesta de <a href="https://pubmed.ncbi.nlm.nih.gov/20057926/">Maei et al., 2009</a>.</p>
+<p>Primero se obtienen de las distancias que se compone de las coordenadas del animal, las diferencias del animal al punto de referencia (annulus blanco), el cuadrado de la distancia Euclidiana, la distancia Euclidiana y el promedia de la distancia (<span class="math inline">\(σ_d\)</span>). Con estos parámetros, se calcula la distancia del animal a la plataforma en cada tiempo utilizando la distancia Euclidiana tomando en cuenta las coordenadas del animal y de la plataforma planco.</p>
+<p><span class="math display">\[
+d = \sqrt{(x_a - x_b) + (y_a - y_b)^2}
+\]</span></p>
+<p>Las medias ponderadas y la matriz de varianza-covarianza se obtuvo con el siguiente código, donde la matriz de covarianza se construye con las medias ponderadas y la matriz de covarianza de valores Eigen se calcula para obtener la varianza <span class="math inline">\(σ_a^2\)</span> y <span class="math inline">\(𝜎_b^2\)</span>. Con estos parámetros vamos a calcular la varianza de los vectores de las distancias del animal respecto a la plataforma.</p>
+<p>La matriz de covarianza se utiliza para capturar la vraianza y covarianza de los datos en más de una dimensión. Para el caso de dos dimensiones (coordenadas X y Y), la matriz de covarianza se representa como:</p>
+<p><span class="math display">\[
+Σ=\begin{pmatrix}
+Var(x) &amp; Cov(x,y)\\
+Cov(x,y) &amp; Var(y)
+\end{pmatrix}
+\]</span></p>
+<p>donde Var(x) representa la varianza de las coordenadas X, Var(y) representa la varianza de las coordenadas Y, y Cov(x,y) representa la covarianza entre las coordenadas de X y Y. Esta matriz de covarianza resume cómo las coordenadas varían entre ellas. Si las coordenadas X y Y están altamente correlacionadas, la covarianza será alta, indicando una relación linear alta.</p>
+<p>Los ejes principales o valores Eigen son las direcciones en las que los datos varían más. Estos ejes se encuentran realizando una descomposición en valores propios de la matriz de covarianza. Los valores propios y los vectores propios obtenidos de esta descomposición tienen las siguientes intepretaciones:</p>
+<ul>
+<li><p>Valores Propios: Representan la magnitud de la varianza a lo largo de los ejes principales.</p></li>
+<li><p>Vectores Propios: Indican la dirección de estos ejes principales.</p></li>
+</ul>
+<p>Estos ejes pueden considerarse como los ejes mayor y menor de una elipse de error que mejor se ajusta a los datos. Ahora, se tiene que sumar los Logaritmos de las varianzas utilizando en el cálculo de la entropía para cuantificar la dispersión o el desorden de los datos en el plano, reflejando el producto de las varianzas a lo largo de los ejes principales</p>
+<p>Para calcular la media de la distancia al cuadrado y calcular la entropía, se calcula la media de la distancia al cuadrado (<span class="math inline">\(σ_2^d\)</span>). El cálculo final de entropía se obtiene sumando los logaritmos de las medias cuadradas de la distancia y el producto de los valores Eigen. En resumen, calculamos <span class="math inline">\(H_{error}\)</span> basados en la fórmula <span class="math inline">\(H_{error} = log(varianza_{distancia})\)</span>, calculamos la varianza de la trayectoria, calculamos la entropía de la trayectoria, realizamos la operación <span class="math inline">\(H_{trayectoria} = log(var_{trayectoria})\)</span> y finalmente calculamos la entropía total como <span class="math inline">\(H_{total} = H_{error} + H_{trayectoria}\)</span></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
