@@ -1,0 +1,258 @@
+```{r}
+library(shiny)
+library(bslib)
+
+# Define UI for slider demo app ----
+ui <- page_sidebar(
+
+  # App title ----
+  title = "Subir Archivo",
+
+  # Sidebar panel for inputs ----
+  sidebar = sidebar(
+
+    # Input: Select a file ----
+    fileInput(
+      "file1",
+      "Choose CSV File",
+      multiple = TRUE,
+      accept = c(
+        "text/csv",
+        "text/comma-separated-values,text/plain",
+        ".csv"
+      )
+    ),
+
+    # Horizontal line ----
+    tags$hr(),
+
+    # Input: Checkbox if file has header ----
+    checkboxInput("header", "Header", TRUE),
+
+    # Input: Select separator ----
+    radioButtons(
+      "sep",
+      "Separator",
+      choices = c(
+        Comma = ",",
+        Semicolon = ";",
+        Tab = "\t"
+      ),
+      selected = ","
+    ),
+
+    # Input: Select quotes ----
+    radioButtons(
+      "quote",
+      "Quote",
+      choices = c(
+        None = "",
+        "Double Quote" = '"',
+        "Single Quote" = "'"
+      ),
+      selected = '"'
+    ),
+
+    # Horizontal line ----
+    tags$hr(),
+
+    # Input: Select number of rows to display ----
+    radioButtons(
+      "disp",
+      "Display",
+      choices = c(
+        Head = "head",
+        All = "all"
+      ),
+      selected = "head"
+    )
+  ),
+
+  # Output: Data file ----
+  tableOutput("contents")
+)
+
+# Define server logic to read selected file ----
+server <- function(input, output) {
+  output$contents <- renderTable({
+    # input$file1 will be NULL initially. After the user selects
+    # and uploads a file, head of that data file by default,
+    # or all rows if selected, will be shown.
+
+    req(input$file1)
+
+    df <- read.csv(
+      input$file1$datapath,
+      header = input$header,
+      sep = input$sep,
+      quote = input$quote
+    )
+
+    if (input$disp == "head") {
+      return(head(df))
+    } else {
+      return(df)
+    }
+  })
+}
+
+# Create Shiny app ----
+shinyApp(ui, server)
+```
+
+mpgData <- readr::read_csv("water_maze.csv")
+
+mpgData |> 
+  dplyr::select(prueba, distancioa_media_blanco, zona_blanco)
+  
+  
+  
+webr::install("ggplot2")
+webr::install("htmltools")
+
+
+https://shinylive.io/r/examples/#sliders
+
+
+https://rstudio.github.io/renv/articles/renv.html
+
+https://quarto.thecoatlessprofessor.com/r-shinylive-demo/
+
+https://github.com/coatless-tutorials/convert-shiny-app-r-shinylive/blob/main/app.R
+
+https://github.com/coatless-textbooks/statistical-concepts-with-shiny-apps/blob/main/index.qmd
+
+https://shiny.posit.co/r/gallery/
+
+v2
+
+```{r}
+
+library(shiny)
+library(bslib)
+
+# Define UI for slider demo app ----
+ui <- page_sidebar(
+
+  # App title ----
+  title = "Subir Archivo",
+
+  # Sidebar panel for inputs ----
+  sidebar = sidebar(
+
+    # Input: Select a file ----
+    fileInput(
+      "file1",
+      "Choose CSV File",
+      multiple = TRUE,
+      accept = c(
+        "text/csv",
+        "text/comma-separated-values,text/plain",
+        ".csv"
+      )
+    ),
+
+    # Horizontal line ----
+    tags$hr(),
+
+    # Input: Checkbox if file has header ----
+    checkboxInput("header", "Header", TRUE),
+
+    # Input: Select separator ----
+    # radioButtons(
+    #   "sep",
+    #   "Separator",
+    #   choices = c(
+    #     Comma = ",",
+    #     Semicolon = ";",
+    #     Tab = "\t"
+    #   ),
+    #   selected = ","
+    # ),
+
+    # Input: Select quotes ----
+    # radioButtons(
+    #   "quote",
+    #   "Quote",
+    #   choices = c(
+    #     None = "",
+    #     "Double Quote" = '"',
+    #     "Single Quote" = "'"
+    #   ),
+    #   selected = '"'
+    # ),
+
+    # Horizontal line ----
+    tags$hr(),
+
+    # Input: Select number of rows to display ----
+    radioButtons(
+      "disp",
+      "Display",
+      choices = c(
+        Head = "head",
+        All = "all"
+      ),
+      selected = "head"
+    )
+  ),
+  
+  navset_card_underline(
+    # Panel with plot ----
+    nav_panel("Plot", plotOutput("plot")),
+
+    # Panel with summary ----
+    nav_panel("Summary", verbatimTextOutput("summary")),
+
+    # Panel with table ----
+    nav_panel("Table", tableOutput("contents"))
+  )
+
+)
+
+# Define server logic to read selected file ----
+server <- function(input, output) {
+  output$contents <- renderTable({
+    # input$file1 will be NULL initially. After the user selects
+    # and uploads a file, head of that data file by default,
+    # or all rows if selected, will be shown.
+
+    req(input$file1)
+
+    df <- read.csv(
+      input$file1$datapath,
+      header = input$header
+      # sep = input$sep,
+      # quote = input$quote
+    )
+
+    if (input$disp == "head") {
+      return(head(df))
+    } else {
+      return(df)
+    }
+  })
+  # 
+  output$plot <- renderPlot({
+    req(input$file1)
+    hist(
+      df(),
+      lty = "blank",
+      xlab = "cruces_blanco",
+      freq = FALSE,
+      main = "",
+      col = "#75AADB",
+      border = "white"
+    )
+  })
+
+  # Generate a summary of the data ----
+  output$summary <- renderPrint({
+    summary((df))
+  })
+}
+
+# Create Shiny app ----
+shinyApp(ui, server)
+
+```
