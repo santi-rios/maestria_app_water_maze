@@ -2,12 +2,12 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.4.549">
+<meta name="generator" content="quarto-1.5.57">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Entropia - Cálculo de Entropia en el Laberinto Acuático de Morris</title>
+<title>Cálculo de Entropia en el Laberinto Acuático de Morris – Entropia</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -71,7 +71,7 @@ ul.task-list li input[type="checkbox"] {
   }
 }</script>
 
-  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
 
 <script type="text/javascript">
@@ -135,7 +135,7 @@ window.Quarto = {
 
 <section id="cálculo" class="level2 unnumbered">
 <h2 class="unnumbered anchored" data-anchor-id="cálculo">Cálculo</h2>
-<p>Coordenadas de annulus original: (220, 77) Coordenadas de annulus Reversa: (130, 169)</p>
+<p>Coordenadas de annulus original: (117.8, 38.4). Coordenadas de annulus Reversa: (61.8, 89.6). NOTA: Las coordenadas del animal y del aparato están en centímetros. Se pueden usar mm, pixeles o lo que se requiera, aunque puedan cambiar las unidades de entropía, pero seguirán siendo equivalentes y proporcionales siempre y cuando se use la misma unidad. Se recomienda hace un poco más grande el radio del aparato para graficar (esto no afecta el cálculo de H). Ejemplo de archivos para esta app en <a href="https://github.com/santi-rios/maestria_app_water_maze/blob/main/fg3_366.csv">este enlace</a> y en <a href="https://github.com/santi-rios/maestria_app_water_maze/blob/main/fg3_367.csv">este enlace</a>.</p>
 <pre class="shinylive-r" data-engine="r"><code>#| standalone: true
 #| viewerHeight: 600
 library(shiny)
@@ -151,18 +151,25 @@ ui &lt;- fluidPage(
       # Input: Select a CSV file
       fileInput("file1", "Subir coordenadas", accept = ".csv"),
       
-      # Numeric input for defining plat_x and plat_y
-      numericInput("plat_x", "Coordenadas de plataforma en X", value = 220),  # Default value set to 220
-      numericInput("plat_y", "Coordenadas de plataforma en Y", value = 77),   # Default value set to 77
+      # Numeric input for defining platform (plat_x, plat_y)
+      numericInput("plat_x", "Coordenadas de plataforma en X", value = 117.8,),  # Default value
+      numericInput("plat_y", "Coordenadas de plataforma en Y", value = 38.4),   # Default value
+
+      # Numeric input for defining the center (wm_centr_x, wm_centr_y)
+      numericInput("wm_centr_x", "Centro en X del aparato", value = 90.13),  # Default value
+      numericInput("wm_centr_y", "Centro en Y del aparato", value = 61.3),  # Default value
+      
+      # Numeric input for defining the radius of the Annulus
+      numericInput("radio_wm", "Radio del aparato", value = 65),  # Default value
       
       tags$hr(),
       
       # Button to calculate entropy
-      actionButton("calc_entropy", "Calcular")
+      actionButton("calc_entropy", "Calcular H")
     ),
     mainPanel(
-      tableOutput("entropy_table"),
-      plotOutput("plot")  # Output plot
+      tableOutput("entropy_table"),  # Display entropy
+      plotOutput("plot")             # Display plot
     )
   )
 )
@@ -175,22 +182,28 @@ server &lt;- function(input, output, session) {
     # Read the CSV file
     data &lt;- read.csv(input$file1$datapath)
     # Clean column names with janitor to ensure consistency
-    data &lt;- janitor::clean_names(data)
+    data &lt;- janitor::clean_names(data) %&gt;%
+        dplyr::slice(2:n())  # Remove the first row if it contains 0,0
     # Rename the first three columns to 'time', 'X', 'Y'
     names(data)[1:3] &lt;- c("time", "X", "Y")
     
-    # Use input values for plat_x and plat_y
+    # Use input values for platform and center coordinates
     plat_x &lt;- input$plat_x
     plat_y &lt;- input$plat_y
+    wm_centr_x &lt;- input$wm_centr_x
+    wm_centr_y &lt;- input$wm_centr_y
+    radio_wm &lt;- input$radio_wm
 
     Xraw &lt;- as.numeric(data$X)
     Yraw &lt;- as.numeric(data$Y)
 
+    # Calculate differences between platform and raw data
     d_x &lt;- Xraw - plat_x
     d_y &lt;- Yraw - plat_y
 
     dist2 &lt;- d_x^2 + d_y^2
 
+    # Entropy calculation
     w &lt;- 1
     sw &lt;- sum(w)
 
@@ -220,37 +233,53 @@ server &lt;- function(input, output, session) {
 
     # Output the plot
     output$plot &lt;- renderPlot({
-      # Define limits with a buffer
-      x_lim_buffer &lt;- 100
-      y_lim_buffer &lt;- 100
-      plot(Xraw, Yraw, xlim=c(min(Xraw) - x_lim_buffer, max(Xraw) + x_lim_buffer), ylim=c(min(Yraw) - y_lim_buffer, max(Yraw) + y_lim_buffer), xlab="X", ylab="Y", main="Coordenadas del ratón alrededor del annulus blanco")
-      points(plat_x, plat_y, col="red", pch=19)  # Reference point
-      segments(Xraw, Yraw, plat_x, plat_y, col="grey")
-      text(plat_x, plat_y, labels="Annulus", pos=4, col="red")
-
-      # Draw error ellipse and principal axes
-      data_points &lt;- data.frame(Xraw, Yraw)
-      ellipse_center &lt;- c(plat_x, plat_y)
-      cov_matrix &lt;- cov(data_points)
-
-      eig &lt;- eigen(cov_matrix)
-      eig_vec &lt;- eig$vectors
-      eig_val &lt;- eig$values
-
-      # Scale eigenvectors for plotting
-      scale_factor &lt;- 2
-      segments(plat_x, plat_y, plat_x + scale_factor * eig_vec[1,1] * sqrt(eig_val[1]), plat_y + scale_factor * eig_vec[2,1] * sqrt(eig_val[1]), col="purple")
-      segments(plat_x, plat_y, plat_x + scale_factor * eig_vec[1,2] * sqrt(eig_val[2]), plat_y + scale_factor * eig_vec[2,2] * sqrt(eig_val[2]), col="purple")
+      # Define limits with a buffer around the annulus
+      x_lim_buffer &lt;- radio_wm + 20
+      y_lim_buffer &lt;- radio_wm + 20
+      
+      # Set up the plot window
+      plot(Xraw, Yraw, pch = 4, col = "#3F4E4F", xlim = c(wm_centr_x - x_lim_buffer, wm_centr_x + x_lim_buffer), ylim = c(wm_centr_y - y_lim_buffer, wm_centr_y + y_lim_buffer), xlab = "X", ylab = "Y", main = "Coordenadas del ratón alrededor del Annulus blanco")
+      
+      # Draw the annulus (circle) using base R
+      symbols(wm_centr_x, wm_centr_y, circles = radio_wm, add = TRUE, inches = FALSE, fg = "black", bg = "#98DED9")
+      
+      # Plot the platform as a red point
+      points(plat_x, plat_y, col = "red", pch = 19, cex = 1.5)
+      text(plat_x + 15, plat_y - 20, labels = "Plataforma", col = "red")
+      
+      # Draw lines from each point to the platform
+      segments(Xraw, Yraw, plat_x, plat_y, col = "#3F4E4F", lty = 3)
     })
   })
 }
 
-
 # Create Shiny app
 shinyApp(ui, server)
 
-
 </code></pre>
+</section>
+<section id="ejemplo-de-la-función-ejecutada-en-r" class="level2 unnumbered">
+<h2 class="unnumbered anchored" data-anchor-id="ejemplo-de-la-función-ejecutada-en-r">Ejemplo de la función ejecutada en R</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figuras/fig-entropia-2.png" class="img-fluid figure-img"></p>
+<figcaption>Ejemplo del cálculo de entropia ejectuado en R</figcaption>
+</figure>
+</div>
+<p>Debido a las limitaciones de shinylive, se recomienda bajar el código fuente original (<a href="https://github.com/santi-rios/UNAM-Tesis_Quarto">disponible en este repositorio</a>) y ejecutarlo desde RStudio.</p>
+<p>El script está diseñado para ser ejecutado en solo tres pasos:</p>
+<ol type="1">
+<li>Correr la función.</li>
+<li>Especificar el directorio del archivo a analizar. El archivo tiene que tener las siguientes características: formato <code>CVS</code>; 3 columnas (tiempo [en segundos], X [en cm], Y [en cm]). NOTA, se pude hacer con las coordenadas en mm, pulgadas…etc, pero se tiene que ajustar la función en caso de no proveer en centímetros <a href="https://github.com/santi-rios/maestria_app_water_maze/blob/main/ejemplo_datos.csv">Ver aquí ejemplo de archivo</a>.</li>
+<li>Lllamar a la función especificando, en orden, las coordenadas de la plataforma en x, y, el centro del water maze en x, y, radio del water maze en cm. Ejemplo: <code>calculate_entropy_and_plot(file_path, 117.8, 38.4, 90.13, 61.3, 65, reversa = FALSE)</code></li>
+<li>En caso de ser una prueba reversa, se debe añadir las coordenadas reversa: <code>calculate_entropy_and_plot(file_path, 117.8, 38.4, 90.13, 61.3, 65, reversa = TRUE, plat_x_rev = 61.8, plat_y_rev = 89.6)</code> para obtener el siguiente gráfico:</li>
+</ol>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="./figuras/fig-entropia-1.png" class="img-fluid figure-img"></p>
+<figcaption>Ejemplo de gráfico de entropía específicando una prueba Reversa</figcaption>
+</figure>
+</div>
 </section>
 <section id="explicación" class="level2 unnumbered">
 <h2 class="unnumbered anchored" data-anchor-id="explicación">Explicación</h2>
@@ -315,18 +344,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     }
     return false;
   }
-  const clipboard = new window.ClipboardJS('.code-copy-button', {
-    text: function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
-      for (const childEl of codeEl.children) {
-        if (isCodeAnnotation(childEl)) {
-          childEl.remove();
-        }
-      }
-      return codeEl.innerText;
-    }
-  });
-  clipboard.on('success', function(e) {
+  const onCopySuccess = function(e) {
     // button target
     const button = e.trigger;
     // don't keep focus
@@ -358,7 +376,47 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     }, 1000);
     // clear code selection
     e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
   });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/santi-rios\.github\.io\/maestria_app_water_maze\/");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
   function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
     const config = {
       allowHTML: true,
@@ -393,7 +451,11 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       try { href = new URL(href).hash; } catch {}
       const id = href.replace(/^#\/?/, "");
       const note = window.document.getElementById(id);
-      return note.innerHTML;
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
     });
   }
   const xrefs = window.document.querySelectorAll('a.quarto-xref');
