@@ -10,8 +10,9 @@ filters:
 
 ## Cálculo {.unnumbered}
 
-Coordenadas de annulus original: (117.8, 38.4)
-Coordenadas de annulus Reversa: (61.8, 89.6)
+Coordenadas de annulus original: (117.8, 38.4).
+Coordenadas de annulus Reversa: (61.8, 89.6).
+NOTA: Las coordenadas del animal y del aparato están en centímetros. Se pueden usar mm, pixeles o lo que se requiera, aunque puedan cambiar las unidades de entropía, pero seguirán siendo equivalentes y proporcionales siempre y cuando se use la misma unidad. Se recomienda hace un poco más grande el radio del aparato para graficar (esto no afecta el cálculo de H). Ejemplo de archivo para esta app en este enlace.
 
 ```{shinylive-r}
 #| standalone: true
@@ -29,18 +30,25 @@ ui <- fluidPage(
       # Input: Select a CSV file
       fileInput("file1", "Subir coordenadas", accept = ".csv"),
       
-      # Numeric input for defining plat_x and plat_y
-      numericInput("plat_x", "Coordenadas de plataforma en X", value = 117.8),  # Default value set to 220
-      numericInput("plat_y", "Coordenadas de plataforma en Y", value = 38.4),   # Default value set to 77
+      # Numeric input for defining platform (plat_x, plat_y)
+      numericInput("plat_x", "Coordenadas de plataforma en X", value = 117.8,),  # Default value
+      numericInput("plat_y", "Coordenadas de plataforma en Y", value = 38.4),   # Default value
+
+      # Numeric input for defining the center (wm_centr_x, wm_centr_y)
+      numericInput("wm_centr_x", "Centro en X del aparato", value = 90.13),  # Default value
+      numericInput("wm_centr_y", "Centro en Y del aparato", value = 61.3),  # Default value
+      
+      # Numeric input for defining the radius of the Annulus
+      numericInput("radio_wm", "Radio del aparato", value = 65),  # Default value
       
       tags$hr(),
       
       # Button to calculate entropy
-      actionButton("calc_entropy", "Calcular")
+      actionButton("calc_entropy", "Calcular H")
     ),
     mainPanel(
-      tableOutput("entropy_table"),
-      plotOutput("plot")  # Output plot
+      tableOutput("entropy_table"),  # Display entropy
+      plotOutput("plot")             # Display plot
     )
   )
 )
@@ -53,22 +61,28 @@ server <- function(input, output, session) {
     # Read the CSV file
     data <- read.csv(input$file1$datapath)
     # Clean column names with janitor to ensure consistency
-    data <- janitor::clean_names(data)
+    data <- janitor::clean_names(data) %>%
+        dplyr::slice(2:n())  # Remove the first row if it contains 0,0
     # Rename the first three columns to 'time', 'X', 'Y'
     names(data)[1:3] <- c("time", "X", "Y")
     
-    # Use input values for plat_x and plat_y
+    # Use input values for platform and center coordinates
     plat_x <- input$plat_x
     plat_y <- input$plat_y
+    wm_centr_x <- input$wm_centr_x
+    wm_centr_y <- input$wm_centr_y
+    radio_wm <- input$radio_wm
 
     Xraw <- as.numeric(data$X)
     Yraw <- as.numeric(data$Y)
 
+    # Calculate differences between platform and raw data
     d_x <- Xraw - plat_x
     d_y <- Yraw - plat_y
 
     dist2 <- d_x^2 + d_y^2
 
+    # Entropy calculation
     w <- 1
     sw <- sum(w)
 
@@ -98,35 +112,28 @@ server <- function(input, output, session) {
 
     # Output the plot
     output$plot <- renderPlot({
-      # Define limits with a buffer
-      x_lim_buffer <- 100
-      y_lim_buffer <- 100
-      plot(Xraw, Yraw, xlim=c(min(Xraw) - x_lim_buffer, max(Xraw) + x_lim_buffer), ylim=c(min(Yraw) - y_lim_buffer, max(Yraw) + y_lim_buffer), xlab="X", ylab="Y", main="Coordenadas del ratón alrededor del annulus blanco")
-      points(plat_x, plat_y, col="red", pch=19)  # Reference point
-      segments(Xraw, Yraw, plat_x, plat_y, col="grey")
-      text(plat_x, plat_y, labels="Annulus", pos=4, col="red")
-
-      # Draw error ellipse and principal axes
-      data_points <- data.frame(Xraw, Yraw)
-      ellipse_center <- c(plat_x, plat_y)
-      cov_matrix <- cov(data_points)
-
-      eig <- eigen(cov_matrix)
-      eig_vec <- eig$vectors
-      eig_val <- eig$values
-
-      # Scale eigenvectors for plotting
-      scale_factor <- 2
-      segments(plat_x, plat_y, plat_x + scale_factor * eig_vec[1,1] * sqrt(eig_val[1]), plat_y + scale_factor * eig_vec[2,1] * sqrt(eig_val[1]), col="purple")
-      segments(plat_x, plat_y, plat_x + scale_factor * eig_vec[1,2] * sqrt(eig_val[2]), plat_y + scale_factor * eig_vec[2,2] * sqrt(eig_val[2]), col="purple")
+      # Define limits with a buffer around the annulus
+      x_lim_buffer <- radio_wm + 20
+      y_lim_buffer <- radio_wm + 20
+      
+      # Set up the plot window
+      plot(Xraw, Yraw, pch = 4, col = "#3F4E4F", xlim = c(wm_centr_x - x_lim_buffer, wm_centr_x + x_lim_buffer), ylim = c(wm_centr_y - y_lim_buffer, wm_centr_y + y_lim_buffer), xlab = "X", ylab = "Y", main = "Coordenadas del ratón alrededor del Annulus blanco")
+      
+      # Draw the annulus (circle) using base R
+      symbols(wm_centr_x, wm_centr_y, circles = radio_wm, add = TRUE, inches = FALSE, fg = "black", bg = "#98DED9")
+      
+      # Plot the platform as a red point
+      points(plat_x, plat_y, col = "red", pch = 19, cex = 1.5)
+      text(plat_x + 15, plat_y - 20, labels = "Plataforma", col = "red")
+      
+      # Draw lines from each point to the platform
+      segments(Xraw, Yraw, plat_x, plat_y, col = "#3F4E4F", lty = 3)
     })
   })
 }
 
-
 # Create Shiny app
 shinyApp(ui, server)
-
 
 
 ```
@@ -140,7 +147,7 @@ Debido a las limitaciones de shinylive, se recomienda bajar el código fuente or
 El script está diseñado para ser ejecutado en solo tres pasos:
 
 1. Correr la función.
-2. Especificar el directorio del archivo a analizar. El archivo tiene que tener las siguientes características: formato `CVS`; 3 columnas (tiempo [en segundos], X [en pixeles], Y [en pixeles]). NOTA, se pude hacer con las coordenadas en centimetros, pulgadas...etc, pero se tiene que ajustar la función en caso de no proveer en pixeles. [Ver aquí ejemplo de archivo](https://github.com/santi-rios/maestria_app_water_maze/blob/main/ejemplo_datos.csv).
+2. Especificar el directorio del archivo a analizar. El archivo tiene que tener las siguientes características: formato `CVS`; 3 columnas (tiempo [en segundos], X [en cm], Y [en cm]). NOTA, se pude hacer con las coordenadas en mm, pulgadas...etc, pero se tiene que ajustar la función en caso de no proveer en centímetros [Ver aquí ejemplo de archivo](https://github.com/santi-rios/maestria_app_water_maze/blob/main/ejemplo_datos.csv).
 3. Lllamar a la función especificando, en orden, las coordenadas de la plataforma en x, y, el centro del water maze en x, y, radio del water maze en cm. Ejemplo: `calculate_entropy_and_plot(file_path, 117.8, 38.4, 90.13, 61.3, 65, reversa = FALSE)`
 4. En caso de ser una prueba reversa, se debe añadir las coordenadas reversa: `calculate_entropy_and_plot(file_path, 117.8, 38.4, 90.13, 61.3, 65, reversa = TRUE, plat_x_rev = 61.8, plat_y_rev = 89.6)` para obtener el siguiente gráfico:
 

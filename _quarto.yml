@@ -1,0 +1,4 @@
+project:
+  title: "Entropia"
+  type: website
+  output-dir: docs
