@@ -1,0 +1,72 @@
+---
+format:
+  html:
+    other-links:
+      - text: NASA Open Data
+        href: https://data.nasa.gov/
+    code-links:
+      - text: Data Import Code
+        icon: file-code
+        href: data-import.py
+---
+
+## Cargar libreríás y funciones
+
+```{r}
+# Cargar librerías necesarias
+library(dplyr)
+library(ggplot2)
+
+# Cargar funciones
+source("./app/functions.R")
+```
+
+
+## Cargar y procesar datos
+
+```{r}
+# Ejemplo 1: Cargar y procesar datos
+cat("=== Ejemplo 1: Cargar datos ===\n")
+
+data_files <- load_and_process_data(file_paths = c("data"))
+```
+
+## Trayectorias y Mapas de Calor
+
+*Mapas de Calor*
+
+🎨 Dos Estilos de Mapas de Calor:
+
+1. Mapa Estándar (`create_heatmap_plot`)
+
+- Gradientes suaves sin divisiones fuertes
+- Paleta de colores personalizada inspirada en Rtrack: amarillo → naranja → rojo oscuro
+- 15 niveles de densidad para transiciones más suaves
+- Contornos sutiles en blanco para definición
+- Círculo del aparato claramente visible en negro
+- Plataforma destacada con punto rojo y centro blanco
+
+2. Mapa Estilo Rtrack (`create_heatmap_rtrack_style`)
+
+- 20 niveles de gradiente para máxima suavidad
+- Fondo completamente limpio (theme_void) como Rtrack
+- Paleta de colores continua con transiciones muy suaves
+- Círculo del aparato prominente
+- Plataforma con borde negro y centro rojo
+- Densidad normalizada para mejor comparación entre grupos
+
+```{r}
+# Crear mapa de calor
+heatmap_plot <- create_heatmap_plot(
+    data = data_files,
+    wm_centr_x = 75,
+    wm_centr_y = 40,
+    plat_x = 100,
+    plat_y = 50,
+    radio_wm = 100
+)
+
+cat("Gráficos creados exitosamente\n")
+
+heatmap_plot
+```
