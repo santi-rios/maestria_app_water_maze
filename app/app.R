@@ -8,16 +8,36 @@ library(gridExtra)
 
 # Load custom functions
 source("functions.R")
+source("simulate_data.R")
 
 # Define UI for app
 ui <- fluidPage(
   theme = bs_theme(version = 4, bootswatch = "minty"),
-  titlePanel("Análisis de Laberinto Acuático de Morris"),
+  titlePanel(
+    div(
+      h1("Análisis de Laberinto Acuático de Morris"),
+      h4("Aplicación para Análisis de Entropía Espacial", style = "color: #6c757d; margin-top: -10px;"),
+      p("Por Santiago Ríos - Maestría en Neurociencias", style = "color: #6c757d; font-size: 14px; margin-top: -5px;")
+    )
+  ),
   sidebarLayout(
     sidebarPanel(
       fileInput("file1", "Subir coordenadas", accept = ".csv", multiple = TRUE),
       checkboxInput("use_sample_data", "Usar datos de ejemplo (2 individuos)", value = TRUE),
       checkboxInput("use_multi_sample_data", "Usar datos de ejemplo (3 individuos)", value = FALSE),
+      tags$hr(),
+      h5("Generación de Datos Aleatorios"),
+      fluidRow(
+        column(8, 
+               numericInput("n_subjects_random", "Sujetos por grupo:", value = 3, min = 1, max = 10, step = 1)
+        ),
+        column(4,
+               br(),
+               actionButton("randomize_data", "Aleatorizar", icon = icon("dice"), 
+                          class = "btn-warning btn-sm", style = "margin-top: 5px;")
+        )
+      ),
+      tags$small("Genera nuevos datos simulados con diferentes comportamientos"),
       tags$hr(),
       h4("Configuración de Arena"),
       checkboxInput("auto_detect", "Detectar automáticamente dimensiones", value = TRUE),
@@ -59,6 +79,48 @@ ui <- fluidPage(
                    tableOutput("detected_params")
                  )
         ),
+        tabPanel("Metodología",
+                 h3("Detección Automática de Parámetros"),
+                 tags$div(
+                   h4("1. Centro de la Arena"),
+                   p("El centro se calcula como el punto medio de los rangos de coordenadas:"),
+                   tags$code("center_x = (mínimo_x + máximo_x) / 2"),
+                   tags$br(),
+                   tags$code("center_y = (mínimo_y + máximo_y) / 2"),
+                   p("Este método asume que los datos están distribuidos simétricamente alrededor del centro de la arena."),
+                   
+                   h4("2. Radio de la Arena"),
+                   p("El radio se estima utilizando el percentil 95 de las distancias desde el centro:"),
+                   tags$code("distancias = √((x - center_x)² + (y - center_y)²)"),
+                   tags$br(),
+                   tags$code("radio = percentil_95(distancias)"),
+                   p("El uso del percentil 95 permite evitar outliers que podrían estar fuera de la arena."),
+                   
+                   h4("3. Detección de Plataforma"),
+                   p("La plataforma se detecta mediante un algoritmo de análisis de movimiento:"),
+                   tags$ol(
+                     tags$li("Se divide el espacio en una grilla de 20×20 celdas"),
+                     tags$li("Para cada celda se calcula:"),
+                     tags$ul(
+                       tags$li("Velocidad promedio: media de √(diff(x)² + diff(y)²)"),
+                       tags$li("Número de puntos en la celda")
+                     ),
+                     tags$li("La plataforma se identifica como la celda con menor velocidad promedio y al menos 5 puntos")
+                   ),
+                   p("Principio: Los animales tienden a moverse menos cuando están en la plataforma."),
+                   
+                   h4("4. Cálculo de Entropía Espacial"),
+                   p("La entropía se calcula utilizando la fórmula:"),
+                   tags$code("H = log(d²) + 0.5 × log(det(Σ))"),
+                   p("Donde:"),
+                   tags$ul(
+                     tags$li("d² = distancia cuadrática media desde la plataforma"),
+                     tags$li("Σ = matriz de covarianza de las coordenadas relativas a la plataforma"),
+                     tags$li("det(Σ) = determinante de la matriz de covarianza")
+                   ),
+                   p("Esta medida cuantifica tanto la dispersión espacial como la variabilidad direccional de la búsqueda.")
+                 )
+        ),
         tabPanel("Entropía Individual", 
                  h3("Análisis de Entropía por Individuo"),
                  p("Cada gráfico muestra la trayectoria individual, la elipse de covarianza (azul) y el valor de entropía calculado."),
@@ -75,6 +137,56 @@ ui <- fluidPage(
         ),
         tabPanel("Estadísticas de Resumen", 
                  verbatimTextOutput("summary_stats")
+        ),
+        tabPanel("Acerca de",
+                 h3("Información del Software"),
+                 tags$div(
+                   h4("Título"),
+                   p(strong("Análisis de Laberinto Acuático de Morris: Aplicación Shiny para Análisis de Entropía Espacial")),
+                   
+                   h4("Autor"),
+                   p(strong("Santiago Ríos"), tags$br(),
+                     "Estudiante de Maestría en Neurociencias", tags$br(),
+                     "Universidad [Nombre de Universidad]", tags$br(),
+                     "Email: santiago.rios@[universidad].edu"),
+                   
+                   h4("Cómo Citar"),
+                   tags$div(style = "background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 10px 0;",
+                     p(strong("Formato APA:")), 
+                     p("Ríos, S. (2025). Análisis de Laberinto Acuático de Morris: Aplicación Shiny para Análisis de Entropía Espacial [Software]. Universidad [Nombre]. https://github.com/santi-rios/maestria_app_water_maze")
+                   ),
+                   
+                   h4("Descripción"),
+                   p("Esta aplicación implementa métodos automatizados para el análisis de datos del laberinto acuático de Morris, 
+                     incluyendo detección automática de parámetros experimentales, cálculo de entropía espacial, y visualizaciones 
+                     interactivas de trayectorias y mapas de calor."),
+                   
+                   h4("Características Principales"),
+                   tags$ul(
+                     tags$li("Detección automática de parámetros de arena y plataforma"),
+                     tags$li("Análisis de entropía espacial con visualización de elipses de covarianza"),
+                     tags$li("Generación de datos sintéticos para pruebas y validación"),
+                     tags$li("Mapas de calor de densidad espacial"),
+                     tags$li("Análisis estadísticos comparativos entre grupos"),
+                     tags$li("Exportación de resultados en formato PDF")
+                   ),
+                   
+                   h4("Tecnologías Utilizadas"),
+                   p("R, Shiny, ggplot2, dplyr, bslib, gridExtra"),
+                   
+                   h4("Licencia"),
+                   p("MIT License - Uso libre para fines académicos y de investigación"),
+                   
+                   h4("Contribuciones"),
+                   p("Las contribuciones y sugerencias son bienvenidas. Por favor contactar al autor o abrir un issue en el repositorio de GitHub."),
+                   
+                   h4("Versión"),
+                   p("Versión 1.0 - Agosto 2025"),
+                   
+                   tags$hr(),
+                   p(tags$small("Desarrollado como parte de los estudios de maestría en neurociencias. 
+                                Para uso académico y de investigación."))
+                 )
         )
       )
     )
@@ -93,8 +205,51 @@ server <- function(input, output, session) {
     platform_y = 38.4
   )
 
+  # Reactive value to store randomly generated data
+  random_data <- reactiveVal(NULL)
+
+  # Generate random data when button is clicked
+  observeEvent(input$randomize_data, {
+    showNotification("Generando datos aleatorios...", type = "message", duration = 2)
+    
+    # Generate new random trajectories
+    new_data <- generate_group_trajectories(
+      n_subjects_per_group = input$n_subjects_random,
+      groups = c("Control", "Tratamiento"),
+      n_points = sample(80:150, 1),  # Random trajectory length
+      max_time = sample(30:60, 1)    # Random trial duration
+    )
+    
+    # Format data to match expected structure
+    formatted_data <- new_data %>%
+      dplyr::rename(
+        time = Time,
+        x = X,
+        y = Y,
+        Individual = Subject
+      ) %>%
+      dplyr::mutate(
+        time = as.numeric(time),
+        x = as.numeric(x),
+        y = as.numeric(y),
+        Group = Treatment  # Add Group column from Treatment
+      )
+    
+    random_data(formatted_data)
+    
+    # Uncheck other data options
+    updateCheckboxInput(session, "use_sample_data", value = FALSE)
+    updateCheckboxInput(session, "use_multi_sample_data", value = FALSE)
+    
+    showNotification(paste("¡Datos aleatorios generados!", input$n_subjects_random, "sujetos por grupo"), 
+                    type = "message", duration = 3)
+  })
+
   getData <- reactive({
-    if (input$use_sample_data) {
+    # Check if random data is available and should be used
+    if (!is.null(random_data()) && !input$use_sample_data && !input$use_multi_sample_data && is.null(input$file1$datapath)) {
+      return(random_data())
+    } else if (input$use_sample_data) {
       data <- load_and_process_data(use_sample = TRUE)
     } else if (input$use_multi_sample_data) {
       # Load the new multi-subject sample data
@@ -345,6 +500,22 @@ server <- function(input, output, session) {
   # Original entropy analysis (grouped)
   observeEvent(input$analyze_btn, {
     data <- getData()
+    
+    # Debug: print data structure
+    cat("Estructura de los datos:\n")
+    cat("Columnas:", paste(colnames(data), collapse = ", "), "\n")
+    cat("Dimensiones:", dim(data), "\n")
+    if(nrow(data) > 0) {
+      cat("Primeras filas:\n")
+      print(head(data, 3))
+    }
+    
+    # Check if data has required columns
+    if (!"Group" %in% colnames(data)) {
+      showNotification("Error: Los datos no tienen la columna 'Group'. Verifique el formato de los datos.", 
+                      type = "error", duration = 5)
+      return()
+    }
 
     # Entropy calculation per group using modular function
     entropy_data <- calculate_group_entropy(data, arena_params$platform_x, arena_params$platform_y)
