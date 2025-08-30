@@ -230,14 +230,14 @@ create_heatmap_plot <- function(data, wm_centr_x = NULL, wm_centr_y = NULL,
                                radio_wm = NULL, plat_x = NULL, plat_y = NULL) {
   
   # Create custom color palette similar to Rtrack (yellow to orange to dark red)
-  heat_colors <- viridisLite::viridis(n = 256)
+#   heat_colors <- viridisLite::viridis(n = 256)
   
   p <- ggplot2::ggplot(data, ggplot2::aes(x = .data$x, y = .data$y)) +
     # Use stat_density_2d_filled for smoother, continuous heatmap
     ggplot2::geom_density_2d_filled(
     #   alpha = 0.8,
     #   bins = 15,  # More bins for smoother gradation
-      contour_var = "count"  # Normalize density for better comparison between groups
+      contour_var = "ndensity"  # Normalize density for better comparison between groups
     ) +
     # Add contour lines for better definition
     # ggplot2::stat_density_2d(
@@ -256,7 +256,7 @@ create_heatmap_plot <- function(data, wm_centr_x = NULL, wm_centr_y = NULL,
     #     title.hjust = 0.5
     #   )
     # ) +
-    ggplot2::facet_wrap(~ .data$Group) +
+    ggplot2 ::facet_wrap(~ .data$Group) +
     ggplot2::labs(
       title = "Mapa de Densidad de Posición por Grupo",
       x = "Coordenada X",
@@ -281,8 +281,8 @@ create_heatmap_plot <- function(data, wm_centr_x = NULL, wm_centr_y = NULL,
       x = wm_centr_x + radio_wm * cos(seq(0, 2*pi, length.out = 100)),
       y = wm_centr_y + radio_wm * sin(seq(0, 2*pi, length.out = 100)),
       color = "black", 
-      linewidth = 1.2,
-      alpha = 0.8
+      linewidth = 0.8,
+      alpha = 0.7
     )
   }
   
@@ -294,6 +294,7 @@ create_heatmap_plot <- function(data, wm_centr_x = NULL, wm_centr_y = NULL,
       color = "red",
       size = 4,
       shape = 19,
+      alpha = 0.6,
       inherit.aes = FALSE
     ) +
     ggplot2::geom_point(
@@ -302,95 +303,9 @@ create_heatmap_plot <- function(data, wm_centr_x = NULL, wm_centr_y = NULL,
       color = "white",
       size = 2,
       shape = 19,
+      alpha = 0.6,
       inherit.aes = FALSE
     )
-  }
-  
-  return(p)
-}
-
-#' Create heatmap plot using Rtrack style (alternative implementation)
-#' @param data processed data frame
-#' @param wm_centr_x center x coordinate of apparatus
-#' @param wm_centr_y center y coordinate of apparatus  
-#' @param radio_wm radius of apparatus
-#' @param plat_x platform x coordinate (optional)
-#' @param plat_y platform y coordinate (optional)
-#' @param use_rtrack logical, whether to try using Rtrack package if available
-#' @return ggplot object or Rtrack plot
-create_heatmap_rtrack_style <- function(data, wm_centr_x, wm_centr_y, radio_wm, 
-                                       plat_x = NULL, plat_y = NULL, use_rtrack = FALSE) {
-  
-  # If Rtrack is requested and available, try to use it
-  if (use_rtrack && requireNamespace("Rtrack", quietly = TRUE)) {
-    # This would require converting data to Rtrack format
-    # For now, we'll fall back to ggplot2 implementation
-    warning("Rtrack implementation not yet available, using ggplot2 version")
-  }
-  
-  # Enhanced ggplot2 version with very smooth gradients
-  heat_colors <- grDevices::colorRampPalette(c("#FFFF33", "#FFA500", "#703E3E"))(20)
-  
-  p <- ggplot2::ggplot(data, ggplot2::aes(x = .data$x, y = .data$y)) +
-    # Use geom_density_2d_filled with more levels for smoother appearance
-    ggplot2::geom_density_2d_filled(
-      alpha = 0.85,
-      bins = 20,
-      contour_var = "ndensity",
-      show.legend = TRUE
-    ) +
-    # Add subtle contour lines
-    ggplot2::geom_density_2d(
-      color = "white", 
-      alpha = 0.2, 
-      linewidth = 0.2,
-      bins = 12
-    ) +
-    # Rtrack-inspired color palette
-    ggplot2::scale_fill_manual(
-      values = heat_colors,
-      name = "Densidad\nNormalizada"
-    ) +
-    ggplot2::facet_wrap(~ .data$Group) +
-    # Add arena boundary circle
-    ggplot2::annotate(
-      "path",
-      x = wm_centr_x + radio_wm * cos(seq(0, 2*pi, length.out = 200)),
-      y = wm_centr_y + radio_wm * sin(seq(0, 2*pi, length.out = 200)),
-      color = "black", 
-      linewidth = 1.5,
-      alpha = 0.9
-    ) +
-    ggplot2::labs(
-      title = "Mapa de Densidad Espacial (Estilo Rtrack)",
-      x = "Coordenada X",
-      y = "Coordenada Y"
-    ) +
-    ggplot2::theme_void() +  # Cleaner background like Rtrack
-    ggplot2::coord_fixed() +
-    ggplot2::theme(
-      legend.position = "bottom",
-      legend.title = ggplot2::element_text(size = 9),
-      legend.text = ggplot2::element_text(size = 8),
-      strip.background = ggplot2::element_blank(),
-      strip.text = ggplot2::element_text(face = "bold", size = 12),
-      plot.title = ggplot2::element_text(hjust = 0.5, size = 14),
-      panel.spacing = ggplot2::unit(1, "lines")
-    )
-  
-  # Add platform location if provided
-  if (!is.null(plat_x) && !is.null(plat_y)) {
-    p <- p + 
-      ggplot2::geom_point(
-        data = data.frame(x = plat_x, y = plat_y),
-        ggplot2::aes(x = .data$x, y = .data$y),
-        color = "black",
-        size = 5,
-        shape = 21,
-        fill = "red",
-        stroke = 1,
-        inherit.aes = FALSE
-      )
   }
   
   return(p)

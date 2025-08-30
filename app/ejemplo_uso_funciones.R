@@ -73,17 +73,9 @@ heatmap_plot_standard <- create_heatmap_plot(
   plat_x, plat_y                     # Parámetros de la plataforma
 )
 
-# Crear mapa de calor estilo Rtrack (más suave)
-heatmap_plot_rtrack <- create_heatmap_rtrack_style(
-  data_sample,
-  wm_centr_x, wm_centr_y, radio_wm,  # Parámetros del aparato
-  plat_x, plat_y                     # Parámetros de la plataforma
-)
-
 cat("Gráficos creados exitosamente\n")
 cat("- Gráfico de trayectorias: trajectory_plot\n")
 cat("- Mapa de calor estándar: heatmap_plot_standard\n") 
-cat("- Mapa de calor estilo Rtrack: heatmap_plot_rtrack\n")
 
 # Ejemplo 6: Guardar gráficos (opcional)
 # ggsave("trajectory_plot.png", trajectory_plot, width = 10, height = 8)

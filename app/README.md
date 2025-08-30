@@ -35,7 +35,7 @@ Contiene todas las funciones de análisis:
 - `load_and_process_data()`: Carga y procesa archivos de datos
 - `create_trajectory_plot()`: Crea gráfico de trayectorias
 - `create_heatmap_plot()`: Crea mapa de calor/densidad estándar
-- `create_heatmap_rtrack_style()`: Crea mapa de calor suave estilo Rtrack
+
 
 ### simulate_data.R
 Script para generar datos artificiales realistas:

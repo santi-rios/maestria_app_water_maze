@@ -31,29 +31,27 @@ cat("=== Ejemplo 1: Cargar datos ===\n")
 data_files <- load_and_process_data(file_paths = c("data"))
 ```
 
+Grupos encontrado
+
+```{r}
+cat("Grupos encontrados:", paste(unique(data_files$Group), collapse = ", "), "\n")
+
+```
+
 ## Trayectorias y Mapas de Calor
 
 *Mapas de Calor*
 
-🎨 Dos Estilos de Mapas de Calor:
+🎨 Mapas de Calor:
 
 1. Mapa Estándar (`create_heatmap_plot`)
 
 - Gradientes suaves sin divisiones fuertes
-- Paleta de colores personalizada inspirada en Rtrack: amarillo → naranja → rojo oscuro
 - 15 niveles de densidad para transiciones más suaves
 - Contornos sutiles en blanco para definición
 - Círculo del aparato claramente visible en negro
 - Plataforma destacada con punto rojo y centro blanco
 
-2. Mapa Estilo Rtrack (`create_heatmap_rtrack_style`)
-
-- 20 niveles de gradiente para máxima suavidad
-- Fondo completamente limpio (theme_void) como Rtrack
-- Paleta de colores continua con transiciones muy suaves
-- Círculo del aparato prominente
-- Plataforma con borde negro y centro rojo
-- Densidad normalizada para mejor comparación entre grupos
 
 ```{r}
 # Crear mapa de calor
@@ -70,3 +68,74 @@ cat("Gráficos creados exitosamente\n")
 
 heatmap_plot
 ```
+
+*Trayectorias*
+
+```{r}
+# Parámetros del aparato
+wm_centr_x <- 90.13
+wm_centr_y <- 61.3
+plat_x <- 100
+plat_y <- 50
+radio_wm <- 65
+
+# Crear gráfico de trayectorias
+trajectory_plot <- create_trajectory_plot(
+  data_files, plat_x, plat_y, wm_centr_x, wm_centr_y, radio_wm
+)
+
+trajectory_plot
+```
+
+
+## Entropia
+
+
+```{r}
+# Definir parámetros de la plataforma
+plat_x <- 117.8
+plat_y <- 38.4
+
+entropy_results <- calculate_group_entropy(data_files, plat_x, plat_y)
+print(entropy_results)
+```
+
+## Estadística
+
+*Resumen Descriptivo*
+
+```{r}
+cat("\n=== Ejemplo 3: Estadísticas de resumen ===\n")
+
+summary_stats <- calculate_summary_stats(data_files)
+print(summary_stats)
+```
+
+*Pruebas*
+
+```{r}
+cat("\n=== Ejemplo 4: Pruebas estadísticas ===\n")
+
+statistical_results <- perform_statistical_tests(summary_stats)
+cat("Tipo de prueba:", statistical_results$test_type, "\n")
+
+if (statistical_results$test_type == "t-test") {
+  if (!is.null(statistical_results$distance_test)) {
+    cat("P-valor para distancia:", statistical_results$distance_test$p.value, "\n")
+  }
+  if (!is.null(statistical_results$velocity_test)) {
+    cat("P-valor para velocidad:", statistical_results$velocity_test$p.value, "\n")
+  }
+}
+
+statistical_results
+```
+
+# Crear Trayectorias
+
+```{r}
+source("./app/simulate_data.R")
+```
+
+*Una sola trayectoria*
+
