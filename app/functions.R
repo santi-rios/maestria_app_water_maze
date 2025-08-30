@@ -80,9 +80,9 @@ calculate_entropy <- function(x, y, plat_x, plat_y) {
 #' @return data frame with Group and entropy columns
 calculate_group_entropy <- function(data, plat_x, plat_y) {
   entropy_data <- data %>%
-    dplyr::group_by(.data$Group) %>% 
+    dplyr::group_by(Group) %>% 
     dplyr::summarise(
-      entropy = calculate_entropy(.data$x, .data$y, plat_x, plat_y),
+      entropy = calculate_entropy(x, y, plat_x, plat_y),
       .groups = 'drop'
     )
   
@@ -273,13 +273,16 @@ create_heatmap_plot <- function(data, wm_centr_x = NULL, wm_centr_y = NULL,
   
   p <- ggplot2::ggplot(data, ggplot2::aes(x = .data$x, y = .data$y)) +
     ggplot2::geom_density_2d_filled(
-      contour_var = "ndensity"  # Normalize density for better comparison between groups
+      contour_var = "ndensity",  # Normalize density for better comparison between groups
+      alpha = 0.8
     ) +
     ggplot2::facet_wrap(~ .data$Group) +
     ggplot2::labs(
       title = "Mapa de Densidad de Posición por Grupo",
+      subtitle = "Colores más intensos indican mayor concentración de tiempo",
       x = "Coordenada X",
-      y = "Coordenada Y"
+      y = "Coordenada Y",
+      fill = "Densidad\nRelativa"
     ) +
     ggplot2::theme_minimal() +
     ggplot2::coord_fixed() +
@@ -291,6 +294,16 @@ create_heatmap_plot <- function(data, wm_centr_x = NULL, wm_centr_y = NULL,
       panel.background = ggplot2::element_rect(fill = "white", color = NA),
       strip.background = ggplot2::element_rect(fill = "lightgray", color = NA),
       strip.text = ggplot2::element_text(face = "bold")
+    ) +
+    ggplot2::guides(
+      fill = ggplot2::guide_colorsteps(
+        title = "Densidad de\nOcupación",
+        title.position = "top",
+        title.hjust = 0.5,
+        label.position = "bottom",
+        barwidth = ggplot2::unit(15, "lines"),
+        barheight = ggplot2::unit(0.5, "lines")
+      )
     )
   
   # Add arena boundary circle if parameters provided

@@ -23,13 +23,12 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       fileInput("file1", "Subir coordenadas", accept = ".csv", multiple = TRUE),
-      checkboxInput("use_sample_data", "Usar datos de ejemplo (2 individuos)", value = TRUE),
-      checkboxInput("use_multi_sample_data", "Usar datos de ejemplo (3 individuos)", value = FALSE),
       tags$hr(),
       h5("Generación de Datos Aleatorios"),
+      p("Genera datos simulados con diferentes comportamientos de aprendizaje"),
       fluidRow(
         column(8, 
-               numericInput("n_subjects_random", "Sujetos por grupo:", value = 3, min = 1, max = 10, step = 1)
+               numericInput("n_subjects_random", "Sujetos por grupo:", value = 8, min = 1, max = 15, step = 1)
         ),
         column(4,
                br(),
@@ -129,7 +128,18 @@ ui <- fluidPage(
                  tableOutput("entropy_summary_table")
         ),
         tabPanel("Entropía Agrupada", 
-                 plotOutput("plot"),
+                 h3("Trayectorias y Análisis de Entropía por Grupo"),
+                 fluidRow(
+                   column(6, 
+                          h4("Trayectorias por Grupo"),
+                          plotOutput("plot")
+                   ),
+                   column(6,
+                          h4("Distribución de Entropía"),
+                          plotOutput("entropy_barplot")
+                   )
+                 ),
+                 h4("Valores de Entropía por Grupo"),
                  tableOutput("entropy_table")
         ),
         tabPanel("Mapa de Calor", 
@@ -237,42 +247,45 @@ server <- function(input, output, session) {
     
     random_data(formatted_data)
     
-    # Uncheck other data options
-    updateCheckboxInput(session, "use_sample_data", value = FALSE)
-    updateCheckboxInput(session, "use_multi_sample_data", value = FALSE)
-    
     showNotification(paste("¡Datos aleatorios generados!", input$n_subjects_random, "sujetos por grupo"), 
                     type = "message", duration = 3)
   })
 
   getData <- reactive({
     # Check if random data is available and should be used
-    if (!is.null(random_data()) && !input$use_sample_data && !input$use_multi_sample_data && is.null(input$file1$datapath)) {
+    if (!is.null(random_data()) && is.null(input$file1$datapath)) {
       return(random_data())
-    } else if (input$use_sample_data) {
-      data <- load_and_process_data(use_sample = TRUE)
-    } else if (input$use_multi_sample_data) {
-      # Load the new multi-subject sample data
-      files <- c("sample_data_control_multi.csv", "sample_data_treatment_multi.csv")
-      data_list <- lapply(files, read.csv)
-      names(data_list) <- c("Control", "Treatment")
-      data <- dplyr::bind_rows(data_list, .id = "Group")
-      data <- janitor::clean_names(data)
-      if ("treatment" %in% names(data)) {
-        data$Group <- data$treatment
-      }
-      data$time <- as.numeric(as.character(data$time))
-      data$x <- as.numeric(as.character(data$x))
-      data$y <- as.numeric(as.character(data$y))
-      data <- data %>% dplyr::filter(!is.na(time), !is.na(x), !is.na(y))
     } else if (!is.null(input$file1$datapath)) {
       data <- load_and_process_data(
         file_paths = input$file1$datapath,
         use_sample = FALSE
       )
     } else {
-      # No data available
-      return(NULL)
+      # No data available - generate default random data
+      cat("No hay datos disponibles, generando datos aleatorios por defecto...\n")
+      new_data <- generate_group_trajectories(
+        n_subjects_per_group = 4,
+        groups = c("Control", "Tratamiento"),
+        n_points = sample(80:150, 1),
+        max_time = sample(30:60, 1)
+      )
+      
+      # Format data to match expected structure
+      formatted_data <- new_data %>%
+        dplyr::rename(
+          time = Time,
+          x = X,
+          y = Y,
+          Individual = Subject
+        ) %>%
+        dplyr::mutate(
+          time = as.numeric(time),
+          x = as.numeric(x),
+          y = as.numeric(y),
+          Group = Treatment  # Add Group column from Treatment
+        )
+      
+      return(formatted_data)
     }
     return(data)
   })
@@ -393,7 +406,23 @@ server <- function(input, output, session) {
   output$entropy_plots_ui <- renderUI({
     results <- entropy_results()
     if (is.null(results)) {
-      return(p("No hay datos para analizar. Cargue datos y haga clic en 'Analizar'."))
+      return(div(
+        style = "text-align: center; padding: 20px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px;",
+        icon("info-circle", style = "font-size: 48px; color: #6c757d; margin-bottom: 10px;"),
+        h4("No hay datos para analizar", style = "color: #6c757d;"),
+        p("Cargue datos o genere datos aleatorios y haga clic en 'Analizar'.", style = "color: #6c757d;")
+      ))
+    }
+    
+    # Check if results have the expected structure
+    if (is.null(results$plots) || length(results$plots) == 0) {
+      return(div(
+        style = "text-align: center; padding: 20px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;",
+        icon("exclamation-triangle", style = "font-size: 48px; color: #856404; margin-bottom: 10px;"),
+        h4("Error al generar gráficos individuales", style = "color: #856404;"),
+        p("No se pudieron crear los gráficos individuales. Verifique que los datos tienen identificadores de individuos.", style = "color: #856404;"),
+        p("Intente cargar nuevos datos o generar datos aleatorios.", style = "color: #856404;")
+      ))
     }
     
     plots <- results$plots
@@ -455,10 +484,10 @@ server <- function(input, output, session) {
       dplyr::group_by(Group) %>%
       dplyr::summarise(
         N = dplyr::n(),
-        `Entropía Media` = round(mean(Entropy), 3),
-        `Desv. Estándar` = round(sd(Entropy), 3),
-        `Mínimo` = round(min(Entropy), 3),
-        `Máximo` = round(max(Entropy), 3),
+        `Entropía Media` = round(mean(entropy), 3),
+        `Desv. Estándar` = round(sd(entropy), 3),
+        `Mínimo` = round(min(entropy), 3),
+        `Máximo` = round(max(entropy), 3),
         .groups = 'drop'
       )
     
@@ -523,6 +552,39 @@ server <- function(input, output, session) {
     # Output the entropy table
     output$entropy_table <- renderTable({
       entropy_data
+    })
+
+    # Create entropy bar plot
+    output$entropy_barplot <- renderPlot({
+      if (nrow(entropy_data) > 0) {
+        ggplot2::ggplot(entropy_data, ggplot2::aes(x = Group, y = entropy, fill = Group)) +
+          ggplot2::geom_col(alpha = 0.8, color = "black", linewidth = 0.5) +
+          ggplot2::geom_text(ggplot2::aes(label = round(entropy, 3)), 
+                            vjust = -0.5, size = 4, fontface = "bold") +
+          ggplot2::labs(
+            title = "Entropía Espacial por Grupo",
+            subtitle = "Valores más altos indican mayor exploración/dispersión",
+            x = "Grupo",
+            y = "Entropía Espacial",
+            fill = "Grupo"
+          ) +
+          ggplot2::theme_minimal() +
+          ggplot2::theme(
+            legend.position = "none",
+            plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
+            plot.subtitle = ggplot2::element_text(hjust = 0.5, color = "gray60"),
+            axis.title = ggplot2::element_text(face = "bold"),
+            axis.text = ggplot2::element_text(size = 11),
+            panel.grid.major.x = ggplot2::element_blank()
+          ) +
+          ggplot2::scale_fill_brewer(type = "qual", palette = "Set2")
+      } else {
+        # Empty plot with message
+        ggplot2::ggplot() +
+          ggplot2::geom_text(ggplot2::aes(x = 0, y = 0, label = "No hay datos de entropía disponibles"),
+                            size = 6, hjust = 0.5, vjust = 0.5) +
+          ggplot2::theme_void()
+      }
     })
 
     # Output the trajectory plot using modular function
