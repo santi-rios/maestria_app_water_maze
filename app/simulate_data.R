@@ -21,10 +21,18 @@ generate_group_trajectories <- function(n_subjects_per_group = 8,
     for (s in seq_len(n_subjects_per_group)) {
       subj_id <- paste0(g, "_", sprintf("%02d", s))
       # Platform differs slightly by group to simulate bias
+      # Use safer radius to ensure platform stays within bounds
       plat_ang <- if (g == groups[1]) pi/3 else 5*pi/4
-      plat_r <- radius * 0.6
+      plat_r <- radius * 0.5  # Reduced from 0.6 to 0.5 for safety
       plat_x <- center_x + plat_r * cos(plat_ang)
       plat_y <- center_y + plat_r * sin(plat_ang)
+      # Double check bounds and adjust if needed
+      plat_dist <- sqrt((plat_x - center_x)^2 + (plat_y - center_y)^2)
+      if (plat_dist > radius * 0.9) {
+        plat_r <- radius * 0.4
+        plat_x <- center_x + plat_r * cos(plat_ang)
+        plat_y <- center_y + plat_r * sin(plat_ang)
+      }
 
       t <- seq(0, max_time, length.out = n_points)
       # Radial tendency: better learners drift toward platform faster

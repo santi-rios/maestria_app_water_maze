@@ -94,6 +94,10 @@ ui <- fluidPage(
       ),
       checkboxInput("click_set_platform", "Definir plataforma con clic en la vista previa", value = FALSE),
       tags$hr(),
+      h4("Opciones de Análisis"),
+      checkboxInput("normalize_entropy", "Normalizar entropía (recomendado para comparaciones)", value = TRUE),
+      tags$small("La normalización hace que los valores sean comparables entre diferentes configuraciones experimentales."),
+      tags$hr(),
       actionButton("analyze_btn", "Analizar"),
       tags$hr(),
       conditionalPanel(
@@ -168,6 +172,39 @@ ui <- fluidPage(
                      tags$li(strong("Elipse de covarianza"), ": elipse al 95% basada en Σ; su tamaño/orientación describe la dirección y dispersión de la trayectoria."),
                      tags$li(strong("Entropía alta"), ": d² grande y/o elipse grande → búsqueda amplia y desorganizada."),
                      tags$li(strong("Entropía baja"), ": d² pequeño y elipse compacta → búsqueda precisa y próxima a la plataforma.")
+                   ),
+                   tags$hr(),
+                   h4("Comparaciones Entre Grupos: Mejores Prácticas"),
+                   tags$div(style = "background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 10px 0;",
+                     h5("⚠️ Consideraciones Importantes para Comparaciones Válidas"),
+                     tags$ul(
+                       tags$li(strong("Unidades de medida consistentes"), ": Todos los grupos deben usar las mismas unidades (píxeles, mm, cm). La entropía depende logarítmicamente de la escala."),
+                       tags$li(strong("Misma configuración experimental"), ": Arena del mismo tamaño, cámara a la misma altura, misma resolución de grabación."),
+                       tags$li(strong("Normalización por tamaño de arena"), ": Si compara estudios diferentes, normalice las coordenadas al rango [0,1] antes del análisis."),
+                       tags$li(strong("Misma duración de prueba"), ": Tiempos de grabación similares entre grupos para evitar sesgos por cantidad de datos.")
+                     )),
+                   h5("✅ Cuándo las Comparaciones Son Válidas"),
+                   tags$ul(
+                     tags$li(strong("Mismo laboratorio, mismo setup"), ": Ideal para comparaciones directas."),
+                     tags$li(strong("Protocolos estandarizados"), ": Misma arena, misma cámara, misma resolución, mismo tiempo de prueba."),
+                     tags$li(strong("Datos normalizados"), ": Si usa datos de fuentes diferentes, normalice coordenadas por el tamaño de la arena.")
+                   ),
+                   h5("❌ Cuándo NO Comparar Directamente"),
+                   tags$ul(
+                     tags$li(strong("Diferentes resoluciones de cámara"), ": Píxeles vs. coordenadas físicas sin conversión."),
+                     tags$li(strong("Arenas de diferente tamaño"), ": Sin normalización apropiada."),
+                     tags$li(strong("Diferentes alturas de cámara"), ": Afecta la perspectiva y distorsión."),
+                     tags$li(strong("Tiempos de grabación muy diferentes"), ": >30% de diferencia puede sesgar resultados.")
+                   ),
+                   h5("💡 Estrategias de Normalización"),
+                   tags$ol(
+                     tags$li(strong("Por rango"), ": x_norm = (x - x_min) / (x_max - x_min), igual para y."),
+                     tags$li(strong("Por radio de arena"), ": x_norm = (x - centro_x) / radio, igual para y."),
+                     tags$li(strong("Z-score por sesión"), ": Estandarizar por media y desviación estándar de cada sesión.")
+                   ),
+                   tags$div(style = "background-color: #d1ecf1; padding: 10px; border-left: 4px solid #bee5eb; margin: 10px 0;",
+                     p(strong("Ejemplo práctico"), ": Si un grupo usó cámara a 50 cm (arena = 400 píxeles) y otro a 100 cm (arena = 200 píxeles), 
+                       normalice dividiendo todas las coordenadas por el radio respectivo antes de calcular entropía.")
                    )
                  )
         ),
@@ -197,7 +234,25 @@ ui <- fluidPage(
                    )
                  ),
                  h4("Valores de Entropía por Grupo"),
-                 tableOutput("entropy_table")
+                 tableOutput("entropy_table"),
+                 tags$br(),
+                 
+                 # Información sobre normalización
+                 conditionalPanel(
+                   condition = "input.normalize_entropy",
+                   div(
+                     style = "background-color: #e8f4f8; padding: 10px; border-radius: 5px; margin-top: 10px;",
+                     tags$strong("Nota:"), " Los valores mostrados están normalizados. Los valores normalizados van de 0 a 1, donde 1 representa la máxima entropía posible para un área de exploración uniforme del laberinto."
+                   )
+                 ),
+                 
+                 conditionalPanel(
+                   condition = "!input.normalize_entropy",
+                   div(
+                     style = "background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;",
+                     tags$strong("Nota:"), " Los valores mostrados son entropía sin normalizar. Para comparar entre diferentes configuraciones experimentales, se recomienda activar la normalización."
+                   )
+                 )
         ),
         tabPanel("Mapa de Calor", 
                  plotOutput("heatmap")
@@ -308,7 +363,8 @@ server <- function(input, output, session) {
 
   # Generate random data when button is clicked
   observeEvent(input$randomize_data, {
-    showNotification("Generando datos aleatorios...", type = "message", duration = 2)
+    # Show loading indicator
+    showNotification("Generando datos aleatorios...", type = "message", duration = NULL, id = "randomizing")
     
     # Generate new random trajectories
     new_data <- generate_group_trajectories(
@@ -333,10 +389,13 @@ server <- function(input, output, session) {
         x = as.numeric(x),
         y = as.numeric(y),
         Group = Treatment  # Add Group column from Treatment
-      )
+      ) %>%
+      dplyr::select(time, x, y, Individual, Group)  # Remove Treatment column to avoid confusion
     
     random_data(formatted_data)
     
+    # Remove loading indicator and show success
+    removeNotification("randomizing")
     showNotification(paste("¡Datos aleatorios generados!", input$n_subjects_random, "sujetos por grupo"), 
                     type = "message", duration = 3)
   })
@@ -344,7 +403,15 @@ server <- function(input, output, session) {
   getData <- reactive({
     # Check if random data is available and should be used
     if (!is.null(random_data()) && is.null(input$file1$datapath)) {
-      return(random_data())
+      data <- random_data()
+      # Apply group overrides even for random data
+      overrides <- group_overrides()
+      if (!is.null(overrides) && "Individual" %in% names(data)) {
+        idx <- match(data$Individual, names(overrides))
+        repl <- overrides[idx]
+        data$Group <- ifelse(!is.na(repl), repl, data$Group)
+      }
+      return(data)
     } else if (!is.null(input$file1$datapath)) {
       # Handle uploaded files with user-selected column mappings
       files <- input$file1$datapath
@@ -699,7 +766,8 @@ server <- function(input, output, session) {
         arena_params$platform_y,
         arena_params$center_x,
         arena_params$center_y,
-        arena_params$radius
+        arena_params$radius,
+        normalize = input$normalize_entropy
       )
     } else {
       return(NULL)
@@ -836,9 +904,16 @@ server <- function(input, output, session) {
   observeEvent(input$analyze_btn, {
     data <- getData()
     if (is.null(data)) {
-      showNotification("No hay datos para analizar. Cargue archivos o genere datos aleatorios.", type = "warning", duration = 4)
+      if (identical(input$data_source, "random")) {
+        showNotification("Primero debe generar datos aleatorios usando el botón 'Aleatorizar'.", type = "warning", duration = 5)
+      } else {
+        showNotification("Primero debe cargar archivos CSV con coordenadas.", type = "warning", duration = 5)
+      }
       return()
     }
+    
+    # Show loading indicator for analysis
+    showNotification("Analizando datos... Esto puede tomar unos segundos.", type = "message", duration = NULL, id = "analyzing")
     
     # Debug: print data structure
     cat("Estructura de los datos:\n")
@@ -856,8 +931,8 @@ server <- function(input, output, session) {
       return()
     }
 
-    # Entropy calculation per group using modular function
-    entropy_data <- calculate_group_entropy(data, arena_params$platform_x, arena_params$platform_y)
+    # Entropy calculation per group using modular function with normalization
+    entropy_data <- calculate_group_entropy(data, arena_params$platform_x, arena_params$platform_y, arena_params$center_x, arena_params$center_y, arena_params$radius, normalize = input$normalize_entropy)
 
     # Output the entropy table
     output$entropy_table <- renderTable({
@@ -872,10 +947,10 @@ server <- function(input, output, session) {
           ggplot2::geom_text(ggplot2::aes(label = round(entropy, 3)), 
                             vjust = -0.5, size = 4, fontface = "bold") +
           ggplot2::labs(
-            title = "Entropía Espacial por Grupo",
-            subtitle = "Valores más altos indican mayor exploración/dispersión",
+            title = if (input$normalize_entropy) "Entropía Espacial Normalizada por Grupo" else "Entropía Espacial por Grupo",
+            subtitle = if (input$normalize_entropy) "Valores normalizados (0-1): mayor exploración/dispersión" else "Valores más altos indican mayor exploración/dispersión",
             x = "Grupo",
-            y = "Entropía Espacial",
+            y = if (input$normalize_entropy) "Entropía Espacial Normalizada" else "Entropía Espacial",
             fill = "Grupo"
           ) +
           ggplot2::theme_minimal() +
@@ -1039,6 +1114,10 @@ server <- function(input, output, session) {
         check.names = FALSE
       )
     })
+    
+    # Remove loading indicator and show completion
+    removeNotification("analyzing")
+    showNotification("¡Análisis completado!", type = "message", duration = 3)
   })
 }
 

@@ -11,8 +11,12 @@ library(ggplot2)
 #' @param y numeric vector of y coordinates
 #' @param plat_x platform x coordinate
 #' @param plat_y platform y coordinate
+#' @param center_x arena center x coordinate (for normalization)
+#' @param center_y arena center y coordinate (for normalization)
+#' @param radius arena radius (for normalization)
+#' @param normalize logical, whether to normalize entropy values
 #' @return entropy value
-calculate_entropy <- function(x, y, plat_x, plat_y) {
+calculate_entropy <- function(x, y, plat_x, plat_y, center_x = NULL, center_y = NULL, radius = NULL, normalize = FALSE) {
   # Check if we have enough data points
   if (length(x) < 3 || length(y) < 3) {
     return(NA)
@@ -70,6 +74,21 @@ calculate_entropy <- function(x, y, plat_x, plat_y) {
     return(NA)
   }
   
+  # Normalize entropy if requested and parameters are provided
+  if (normalize && !is.null(center_x) && !is.null(center_y) && !is.null(radius)) {
+    # Calculate theoretical maximum entropy for uniform exploration
+    # Maximum distance from platform to edge of arena
+    max_dist_from_platform <- sqrt((radius)^2 + (radius)^2)
+    
+    # Theoretical maximum entropy (uniform distribution over entire arena)
+    max_entropy <- log(max_dist_from_platform^2) + 0.5 * log((radius^2/4) * (radius^2/4))
+    
+    # Normalize: H_norm = H / H_max
+    if (max_entropy > 0) {
+      entropy <- entropy / max_entropy
+    }
+  }
+  
   return(entropy)
 }
 
@@ -78,11 +97,11 @@ calculate_entropy <- function(x, y, plat_x, plat_y) {
 #' @param plat_x platform x coordinate
 #' @param plat_y platform y coordinate
 #' @return data frame with Group and entropy columns
-calculate_group_entropy <- function(data, plat_x, plat_y) {
+calculate_group_entropy <- function(data, plat_x, plat_y, center_x = NULL, center_y = NULL, radius = NULL, normalize = FALSE) {
   entropy_data <- data %>%
     dplyr::group_by(Group) %>% 
     dplyr::summarise(
-      entropy = calculate_entropy(x, y, plat_x, plat_y),
+      entropy = calculate_entropy(x, y, plat_x, plat_y, center_x, center_y, radius, normalize),
       .groups = 'drop'
     )
   
@@ -347,13 +366,14 @@ create_heatmap_plot <- function(data, wm_centr_x = NULL, wm_centr_y = NULL,
 #' @param data processed data frame
 #' @param plat_x platform x coordinate
 #' @param plat_y platform y coordinate
-#' @param wm_centr_x center x coordinate (optional)
-#' @param wm_centr_y center y coordinate (optional)
-#' @param radio_wm radius of apparatus (optional)
+#' @param center_x center x coordinate (optional)
+#' @param center_y center y coordinate (optional)
+#' @param radius radius of apparatus (optional)
+#' @param normalize whether to normalize entropy values
 #' @return list with plots and entropy values per individual
 create_individual_entropy_plots <- function(data, plat_x, plat_y, 
-                                           wm_centr_x = NULL, wm_centr_y = NULL, 
-                                           radio_wm = NULL) {
+                                           center_x = NULL, center_y = NULL, 
+                                           radius = NULL, normalize = FALSE) {
   
   # Check if data has individual identifiers
   if (!"individual" %in% names(data) && !"Individual" %in% names(data)) {
@@ -390,7 +410,7 @@ create_individual_entropy_plots <- function(data, plat_x, plat_y,
     if (nrow(ind_data) < 3) next  # Skip if insufficient data
     
     # Calculate entropy
-    entropy_val <- calculate_entropy(ind_data$x, ind_data$y, plat_x, plat_y)
+    entropy_val <- calculate_entropy(ind_data$x, ind_data$y, plat_x, plat_y, center_x, center_y, radius, normalize)
     
   # Calculate covariance matrix for ellipse
     d_x <- ind_data$x - plat_x
@@ -424,7 +444,7 @@ create_individual_entropy_plots <- function(data, plat_x, plat_y,
       ggplot2::geom_point(x = plat_x, y = plat_y,
                          color = "red", size = 4, alpha = 0.8) +
       ggplot2::labs(
-        title = paste0(group_name, " - ", ind_name, "\nEntropía: ", round(entropy_val, 3)),
+        title = paste0(group_name, " - ", ind_name, "\nEntropía", if(normalize) " Normalizada" else "", ": ", round(entropy_val, 3)),
         subtitle = "Elipse: 95% covarianza (dirección/dispersion) · Círculo punteado: radio RMS",
         x = "Coordenada X", y = "Coordenada Y"
       ) +
@@ -438,11 +458,11 @@ create_individual_entropy_plots <- function(data, plat_x, plat_y,
       )
     
     # Add arena boundary if provided
-    if (!is.null(wm_centr_x) && !is.null(wm_centr_y) && !is.null(radio_wm)) {
+    if (!is.null(center_x) && !is.null(center_y) && !is.null(radius)) {
       p <- p + ggplot2::annotate(
         "path",
-        x = wm_centr_x + radio_wm * cos(seq(0, 2*pi, length.out = 100)),
-        y = wm_centr_y + radio_wm * sin(seq(0, 2*pi, length.out = 100)),
+        x = center_x + radius * cos(seq(0, 2*pi, length.out = 100)),
+        y = center_y + radius * sin(seq(0, 2*pi, length.out = 100)),
         color = "black", linewidth = 0.6, alpha = 0.25, linetype = "dotted"
       )
     }

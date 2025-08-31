@@ -7,15 +7,17 @@ suppressPackageStartupMessages({
 })
 
 # --- Core entropy computation -------------------------------------------------
-calculate_entropy <- function(x, y, platform_x, platform_y, eps = 1e-8) {
+calculate_entropy <- function(x, y, platform_x, platform_y, center_x = NULL, center_y = NULL, radius = NULL, normalize = TRUE, eps = 1e-8) {
   # Shift coordinates relative to platform
   rx <- x - platform_x
   ry <- y - platform_y
   n <- length(rx)
   if (n < 3L) return(NA_real_)
+  
   # Radial mean square distance
   d2 <- mean(rx^2 + ry^2, na.rm = TRUE)
   if (!is.finite(d2) || d2 <= 0) d2 <- eps
+  
   # Covariance of relative coordinates
   X <- cbind(rx, ry)
   # Regularize covariance for stability
@@ -30,17 +32,32 @@ calculate_entropy <- function(x, y, platform_x, platform_y, eps = 1e-8) {
   eig[!is.finite(eig) | eig < eps] <- eps
   log_det <- sum(log(eig))
   H <- log(d2) + 0.5 * log_det
+  
+  # Normalize entropy if arena parameters provided
+  if (normalize && !is.null(radius) && is.finite(radius) && radius > 0) {
+    # Normalize by theoretical maximum entropy for this arena size
+    # Maximum occurs when animal explores entire arena uniformly
+    max_d2 <- (radius^2) / 2  # Expected d2 for uniform distribution in circle
+    max_cov <- (radius^2) / 4 * diag(2)  # Maximum covariance matrix
+    max_log_det <- 2 * log(radius^2 / 4)
+    H_max <- log(max_d2) + 0.5 * max_log_det
+    
+    # Normalized entropy: 0 = perfect performance, 1 = random exploration
+    H_norm <- H / H_max
+    return(as.numeric(H_norm))
+  }
+  
   as.numeric(H)
 }
 
 # --- Group-level entropy summary ---------------------------------------------
-calculate_group_entropy <- function(data, platform_x, platform_y) {
+calculate_group_entropy <- function(data, platform_x, platform_y, center_x = NULL, center_y = NULL, radius = NULL, normalize = TRUE) {
   df <- data
   if (!"Group" %in% names(df)) df$Group <- "Grupo"
   df %>%
     dplyr::group_by(Group) %>%
     dplyr::summarise(
-      entropy = calculate_entropy(x, y, platform_x, platform_y),
+      entropy = calculate_entropy(x, y, platform_x, platform_y, center_x, center_y, radius, normalize),
       .groups = "drop"
     )
 }
@@ -110,7 +127,7 @@ create_individual_entropy_plots <- function(data, platform_x, platform_y, center
   ent_df <- df %>%
     dplyr::group_by(Individual, Group) %>%
     dplyr::summarise(
-      entropy = calculate_entropy(x, y, platform_x, platform_y),
+      entropy = calculate_entropy(x, y, platform_x, platform_y, center_x, center_y, radius, normalize = TRUE),
       .groups = "drop"
     )
 
