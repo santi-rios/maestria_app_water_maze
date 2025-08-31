@@ -1,0 +1,18 @@
+# Archivos mínimos necesarios para el deployment
+# Mantener solo estos archivos en la carpeta app/ para un deployment más rápido:
+
+app.R                    # ✅ Archivo principal
+functions.R              # ✅ Funciones de análisis
+simulate_data.R          # ✅ Generación de datos de prueba
+sample_data.csv          # ✅ Datos de ejemplo principal
+
+# Archivos opcionales (pueden eliminarse para deployment más rápido):
+# README.md
+# demo_heatmap.R
+# ejemplo_uso_funciones.R
+# test_*.R
+# sample_data_*.csv (excepto sample_data.csv)
+
+# IMPORTANTE: Los datos de validación (grupo1_processed.csv, grupo2_processed.csv)
+# NO están en la carpeta app/, por lo que NO se subirán automáticamente.
+# Esto es CORRECTO porque son solo para desarrollo/validación local.
