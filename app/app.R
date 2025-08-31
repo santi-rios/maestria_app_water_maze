@@ -23,6 +23,8 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       fileInput("file1", "Subir coordenadas", accept = ".csv", multiple = TRUE),
+  # Dynamic UI to map columns when a file is uploaded
+  uiOutput("column_mapper_ui"),
       tags$hr(),
       h5("Generación de Datos Aleatorios"),
       p("Genera datos simulados con diferentes comportamientos de aprendizaje"),
@@ -256,10 +258,94 @@ server <- function(input, output, session) {
     if (!is.null(random_data()) && is.null(input$file1$datapath)) {
       return(random_data())
     } else if (!is.null(input$file1$datapath)) {
-      data <- load_and_process_data(
-        file_paths = input$file1$datapath,
-        use_sample = FALSE
-      )
+      # Handle uploaded files with user-selected column mappings
+      files <- input$file1$datapath
+      if (is.null(files) || length(files) == 0) return(NULL)
+
+      # Validate required mappings
+      req(input$col_time, input$col_x, input$col_y)
+
+      all_data <- list()
+      for (i in seq_along(files)) {
+        fp <- files[i]
+        df <- tryCatch({
+          read.csv(fp, check.names = FALSE)
+        }, error = function(e) {
+          showNotification(paste("No se pudo leer el archivo:", basename(fp)), type = "error")
+          NULL
+        })
+        if (is.null(df)) next
+
+        # Also support cleaned names
+        df_clean <- janitor::clean_names(df)
+
+        # Helper: resolve selected column name against raw and cleaned names
+        resolve_col <- function(sel) {
+          if (is.null(sel) || sel == "") return(NA_character_)
+          # Exact match in raw
+          if (sel %in% names(df)) return(sel)
+          # Try cleaned match
+          sel_clean <- janitor::make_clean_names(sel)
+          idx <- which(names(df_clean) == sel_clean)
+          if (length(idx) == 1) {
+            # map back to raw by position
+            return(names(df)[idx])
+          }
+          # Try case-insensitive match
+          idx2 <- which(tolower(names(df)) == tolower(sel))
+          if (length(idx2) == 1) return(names(df)[idx2])
+          NA_character_
+        }
+
+        c_time <- resolve_col(input$col_time)
+        c_x    <- resolve_col(input$col_x)
+        c_y    <- resolve_col(input$col_y)
+        c_ind  <- resolve_col(input$col_individual)
+        c_grp  <- resolve_col(input$col_group)
+
+        missing_cols <- c()
+        if (is.na(c_time)) missing_cols <- c(missing_cols, input$col_time)
+        if (is.na(c_x))    missing_cols <- c(missing_cols, input$col_x)
+        if (is.na(c_y))    missing_cols <- c(missing_cols, input$col_y)
+        if (length(missing_cols) > 0) {
+          showNotification(paste("Columnas no encontradas en", basename(fp), ":",
+                                 paste(missing_cols, collapse = ", ")), type = "error", duration = 7)
+          next
+        }
+
+        out <- data.frame(
+          time = suppressWarnings(as.numeric(as.character(df[[c_time]]))),
+          x    = suppressWarnings(as.numeric(as.character(df[[c_x]]))),
+          y    = suppressWarnings(as.numeric(as.character(df[[c_y]])))
+        )
+        # Drop rows with NA essentials
+        out <- out %>% dplyr::filter(!is.na(time), !is.na(x), !is.na(y))
+
+        # Individual column optional
+        if (!is.na(c_ind)) {
+          out$Individual <- as.character(df[[c_ind]])
+        } else {
+          # Default: use file base name as Individual id
+          out$Individual <- tools::file_path_sans_ext(basename(fp))
+        }
+
+        # Group assignment priority:
+        # 1) If user selected a group column
+        # 2) Else if checkbox to use filename as group is TRUE
+        # 3) Else use provided group label or fallback 'Grupo'
+        if (!is.na(c_grp)) {
+          out$Group <- as.character(df[[c_grp]])
+        } else if (isTRUE(input$group_from_filename)) {
+          out$Group <- tools::file_path_sans_ext(basename(fp))
+        } else {
+          out$Group <- if (!is.null(input$group_label) && nzchar(input$group_label)) input$group_label else "Grupo"
+        }
+
+        all_data[[length(all_data) + 1]] <- out
+      }
+
+      if (length(all_data) == 0) return(NULL)
+      data <- dplyr::bind_rows(all_data)
     } else {
       # No data available - generate default random data
       cat("No hay datos disponibles, generando datos aleatorios por defecto...\n")
@@ -288,6 +374,53 @@ server <- function(input, output, session) {
       return(formatted_data)
     }
     return(data)
+  })
+
+  # Reactive: discover columns from uploaded file to populate mapping UI
+  upload_columns <- reactive({
+    req(input$file1)
+    fp <- input$file1$datapath[1]
+    cols <- tryCatch({
+      nm <- names(read.csv(fp, nrows = 1, check.names = FALSE))
+      if (is.null(nm)) character(0) else nm
+    }, error = function(e) character(0))
+    cols
+  })
+
+  # Guess helper for defaults
+  guess_col <- function(cols, patterns) {
+    idx <- which(vapply(cols, function(nm) any(grepl(patterns, nm, ignore.case = TRUE)), logical(1)))
+    if (length(idx) >= 1) cols[idx[1]] else ""
+  }
+
+  output$column_mapper_ui <- renderUI({
+    req(input$file1)
+    cols <- upload_columns()
+    if (length(cols) == 0) return(NULL)
+
+    # Guesses
+    guess_time <- guess_col(cols, pattern <- "^time$|time|t(ime)?|sec|ms")
+    guess_x    <- guess_col(cols, pattern <- "^x$|xpos|posx|x_coord|coord.?x")
+    guess_y    <- guess_col(cols, pattern <- "^y$|ypos|posy|y_coord|coord.?y")
+    guess_ind  <- guess_col(cols, pattern <- "id$|subject|animal|mouse|rat|ind(ividuo|ividual)?")
+    guess_grp  <- guess_col(cols, pattern <- "group|treat(ment)?|condition|grupo")
+
+    wellPanel(
+      h5("Mapeo de Columnas del Archivo"),
+      fluidRow(
+        column(6, selectInput("col_time", "Columna de tiempo", choices = cols, selected = guess_time)),
+        column(6, selectInput("col_individual", "Columna de individuo (opcional)", choices = c("" , cols), selected = guess_ind))
+      ),
+      fluidRow(
+        column(6, selectInput("col_x", "Columna X", choices = cols, selected = guess_x)),
+        column(6, selectInput("col_y", "Columna Y", choices = cols, selected = guess_y))
+      ),
+      fluidRow(
+        column(6, selectInput("col_group", "Columna de grupo (si existe)", choices = c("", cols), selected = guess_grp)),
+        column(6, checkboxInput("group_from_filename", "Asignar grupo usando nombre del archivo si falta", value = TRUE))
+      ),
+      textInput("group_label", "Etiqueta de grupo por defecto (si no hay columna)", value = "Grupo")
+    )
   })
 
   # Auto-detect arena parameters when data is loaded
