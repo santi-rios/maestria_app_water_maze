@@ -32,8 +32,12 @@ ui <- fluidPage(
         condition = "input.data_source == 'upload'",
         fileInput("file1", "Subir coordenadas", accept = ".csv", multiple = TRUE),
         # Dynamic UI to map columns when a file is uploaded
-  uiOutput("column_mapper_ui"),
-  actionButton("open_group_editor", "Editar grupos (opcional)", class = "btn-sm btn-outline-secondary")
+        uiOutput("column_mapper_ui"),
+        fluidRow(
+          column(6, actionButton("open_group_editor", "Editar grupos (opcional)", class = "btn-sm btn-outline-secondary")),
+          column(6, actionButton("clear_uploaded", "Limpiar datos cargados", class = "btn-sm btn-danger"))
+        ),
+        tags$small(textOutput("upload_status"))
       ),
       conditionalPanel(
         condition = "input.data_source == 'random'",
@@ -136,6 +140,14 @@ ui <- fluidPage(
                      tags$li("det(Σ) = determinante de la matriz de covarianza")
                    ),
                    p("Esta medida cuantifica tanto la dispersión espacial como la variabilidad direccional de la búsqueda."),
+                   h5("Detalles e interpretación"),
+                   tags$ul(
+                     tags$li(strong("Componente radial (d²)"), ": resume la lejanía promedio respecto a la plataforma. Es equivalente al cuadrado del radio RMS (cuyo círculo está dibujado en las figuras)."),
+                     tags$li(strong("Componente direccional (det(Σ))"), ": proviene de la variabilidad y correlación de los desplazamientos (eigenvalores de Σ). Capta si la búsqueda es alargada en una dirección o amplia en todas."),
+                     tags$li(strong("Invariancias"), ": H es invariante a rotaciones (usa Σ) y responde a escalas de la arena de forma logarítmica, lo que estabiliza valores ante unidades distintas."),
+                     tags$li(strong("Casos límite"), ": si el animal busca sobre la plataforma (d²→0) o sin variabilidad (det(Σ)→0), la fórmula se regulariza para evitar infinitos (se añaden valores mínimos muy pequeños)."),
+                     tags$li(strong("Lectura práctica"), ": H alto combina distancia promedio grande y/o gran dispersión direccional; H bajo indica búsqueda precisa y cercana a la plataforma.")
+                   ),
                    tags$hr(),
                    h4("Visualización e Interpretación"),
                    tags$ul(
@@ -178,6 +190,13 @@ ui <- fluidPage(
                  plotOutput("heatmap")
         ),
         tabPanel("Estadísticas de Resumen", 
+                 wellPanel(
+                   fluidRow(
+                     column(4, selectInput("test_variable", "Variable a probar", choices = c("Entropía (por individuo)"), selected = "Entropía (por individuo)")),
+                     column(4, selectInput("test_method", "Método", choices = c("Auto", "t-test", "ANOVA", "Kruskal-Wallis"), selected = "Auto")),
+                     column(4, checkboxGroupInput("test_checks", "Verificar supuestos", choices = c("Normalidad (Shapiro)" = "shapiro", "Varianzas (Levene/Bartlett)" = "variance"), selected = c("shapiro", "variance")))
+                   )
+                 ),
                  verbatimTextOutput("summary_stats")
         ),
         tabPanel("Acerca de",
@@ -253,6 +272,10 @@ server <- function(input, output, session) {
   group_overrides <- reactiveVal(NULL)
   # Whether user has clicked to set platform
   platform_override <- reactiveVal(FALSE)
+  # Accumulated uploaded datasets (list of data.frames)
+  upload_accum <- reactiveVal(list())
+  # Track processed file paths to prevent duplicate appends
+  processed_files <- reactiveVal(character(0))
 
   # Clear random data when switching data source to upload; provide hint when switching to random
   observeEvent(input$data_source, {
@@ -305,12 +328,29 @@ server <- function(input, output, session) {
       files <- input$file1$datapath
       if (is.null(files) || length(files) == 0) return(NULL)
 
+      # Determine which are new (unprocessed) files
+      already <- processed_files()
+      new_files <- setdiff(files, already)
+      acc <- upload_accum()
+      # If no new files and have accumulated data, return accumulated (with overrides)
+      if (length(new_files) == 0) {
+        if (length(acc) == 0) return(NULL)
+        data <- dplyr::bind_rows(acc)
+        overrides <- group_overrides()
+        if (!is.null(overrides) && "Individual" %in% names(data)) {
+          idx <- match(data$Individual, names(overrides))
+          repl <- overrides[idx]
+          data$Group <- ifelse(!is.na(repl), repl, data$Group)
+        }
+        return(data)
+      }
+
       # Validate required mappings
       req(input$col_time, input$col_x, input$col_y)
 
       all_data <- list()
-      for (i in seq_along(files)) {
-        fp <- files[i]
+      for (i in seq_along(new_files)) {
+        fp <- new_files[i]
         df <- tryCatch({
           read.csv(fp, check.names = FALSE)
         }, error = function(e) {
@@ -388,7 +428,16 @@ server <- function(input, output, session) {
       }
 
       if (length(all_data) == 0) return(NULL)
-      data <- dplyr::bind_rows(all_data)
+  newly <- dplyr::bind_rows(all_data)
+      # Append to accumulator keyed by unique file base names + time range to avoid duplicates
+      # Build a key per chunk
+      chunk_key <- paste0("batch_", as.integer(Sys.time()))
+      acc[[chunk_key]] <- newly
+      upload_accum(acc)
+  # Mark these files as processed
+  processed_files(c(already, new_files))
+      # Bind all uploads for analysis
+      data <- dplyr::bind_rows(acc)
       # Apply group overrides if present
       overrides <- group_overrides()
       if (!is.null(overrides) && "Individual" %in% names(data)) {
@@ -401,6 +450,20 @@ server <- function(input, output, session) {
   return(NULL)
     }
     return(data)
+  })
+
+  # Upload status and clear button
+  output$upload_status <- renderText({
+    acc <- upload_accum()
+    if (length(acc) == 0) return("Sin datos acumulados")
+    n_rows <- sum(vapply(acc, nrow, integer(1)))
+    n_files <- length(acc)
+    paste("Lotes acumulados:", n_files, "- Filas totales:", n_rows)
+  })
+
+  observeEvent(input$clear_uploaded, {
+    upload_accum(list())
+    showNotification("Datos cargados limpiados.", type = "message")
   })
 
   # Reactive: discover columns from uploaded file to populate mapping UI
@@ -824,9 +887,9 @@ server <- function(input, output, session) {
                          arena_params$radius, arena_params$platform_x, arena_params$platform_y)
     })
 
-    # Summary Statistics using modular functions
-    summary_data <- calculate_summary_stats(data)
-    statistical_tests <- perform_statistical_tests(summary_data)
+  # Summary Statistics using modular functions
+  summary_data <- calculate_summary_stats(data)
+  statistical_tests <- perform_statistical_tests(summary_data)
 
     output$summary_stats <- renderPrint({
       cat("Estadísticas de Resumen por Grupo:\n")
@@ -858,6 +921,68 @@ server <- function(input, output, session) {
         }
       } else {
         cat("Se necesita más de un grupo para la comparación estadística.")
+      }
+    })
+
+    # Hypothesis tests on entropy by individual
+    output$summary_stats <- renderPrint({
+      # Keep previous content first
+      cat("Estadísticas de Resumen por Grupo:\n")
+      cat("==================================\n")
+      print(summary_data)
+      cat("\n\nPruebas de hipótesis sobre Entropía (por individuo):\n")
+      cat("==================================\n")
+      results <- entropy_results()
+      if (is.null(results) || is.null(results$entropy_data) || nrow(results$entropy_data) == 0) {
+        cat("No hay datos de entropía por individuo.\n"); return(invisible())
+      }
+      ed <- results$entropy_data
+      ed <- ed[is.finite(ed$entropy), ]
+      if (!"Group" %in% names(ed) || length(unique(ed$Group)) < 2) {
+        cat("Se necesitan ≥2 grupos para probar.\n"); return(invisible())
+      }
+      method <- input$test_method
+      if (identical(method, "Auto")) {
+        method <- if (length(unique(ed$Group)) == 2) "t-test" else "ANOVA"
+      }
+      # Assumption checks
+      if ("shapiro" %in% input$test_checks) {
+        cat("\n- Shapiro-Wilk por grupo:\n")
+        print(by(ed$entropy, ed$Group, shapiro.test))
+      }
+      if ("variance" %in% input$test_checks) {
+        cat("\n- Chequeo de varianzas (Bartlett si normal, Levene si no):\n")
+        ok_normal <- FALSE
+        if ("shapiro" %in% input$test_checks) {
+          sw <- by(ed$entropy, ed$Group, function(x) shapiro.test(x)$p.value)
+          ok_normal <- all(sw > 0.05, na.rm = TRUE)
+        }
+        if (ok_normal) {
+          print(bartlett.test(entropy ~ Group, data = ed))
+        } else {
+          # Levene via car::leveneTest si disponible
+          if (requireNamespace("car", quietly = TRUE)) {
+            print(car::leveneTest(entropy ~ Group, data = ed))
+          } else {
+            cat("Levene no disponible (paquete 'car' no instalado).\n")
+          }
+        }
+      }
+      cat("\n- Prueba principal (", method, "):\n", sep = "")
+      if (identical(method, "t-test") && length(unique(ed$Group)) == 2) {
+        print(t.test(entropy ~ Group, data = ed))
+      } else if (identical(method, "ANOVA") && length(unique(ed$Group)) >= 2) {
+        fit <- aov(entropy ~ Group, data = ed)
+        print(summary(fit))
+        # Post hoc Tukey si ANOVA
+        if (requireNamespace("stats", quietly = TRUE)) {
+          cat("\n- Comparaciones post hoc (Tukey HSD):\n")
+          print(TukeyHSD(fit))
+        }
+      } else if (identical(method, "Kruskal-Wallis")) {
+        print(kruskal.test(entropy ~ Group, data = ed))
+      } else {
+        cat("Método no aplicable a la configuración actual.\n")
       }
     })
   })
