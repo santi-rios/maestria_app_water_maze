@@ -64,6 +64,8 @@ ui <- fluidPage(
                             class = "btn-warning btn-sm", style = "margin-top: 5px;")
           )
         ),
+  sliderInput("bias_control", "Aprendizaje Control (sesgo)", min = 0.002, max = 0.05, value = 0.015, step = 0.001),
+  sliderInput("bias_tratamiento", "Aprendizaje Tratamiento (sesgo)", min = 0.002, max = 0.05, value = 0.006, step = 0.001),
         tags$small("Cada clic genera nuevos datos con comportamientos distintos")
       ),
       tags$hr(),
@@ -203,7 +205,7 @@ ui <- fluidPage(
   tabPanel("Estadísticas de Resumen", 
                  wellPanel(
                    fluidRow(
-                     column(4, selectInput("test_variable", "Variable a probar", choices = c("Entropía (por individuo)"), selected = "Entropía (por individuo)")),
+                     column(4, selectInput("test_variable", "Variable a probar", choices = c("Entropía (entre grupos)"), selected = "Entropía (entre grupos)")),
                      column(4, selectInput("test_method", "Método", choices = c("Auto", "t-test", "ANOVA", "Kruskal-Wallis"), selected = "Auto")),
                      column(4, checkboxGroupInput("test_checks", "Verificar supuestos", choices = c("Normalidad (Shapiro)" = "shapiro", "Varianzas (Levene/Bartlett)" = "variance"), selected = c("shapiro", "variance")))
                    ),
@@ -313,7 +315,9 @@ server <- function(input, output, session) {
       n_subjects_per_group = input$n_subjects_random,
       groups = c("Control", "Tratamiento"),
       n_points = sample(80:150, 1),  # Random trajectory length
-      max_time = sample(30:60, 1)    # Random trial duration
+  max_time = sample(30:60, 1),    # Random trial duration
+  drift_control = input$bias_control,
+  drift_treatment = input$bias_tratamiento
     )
     
     # Format data to match expected structure
@@ -1028,7 +1032,7 @@ server <- function(input, output, session) {
       }
       if (auto_used) note <- paste(note, "(Auto)")
       data.frame(
-        Variable = "Entropía (por individuo)",
+        Variable = "Entropía (entre grupos)",
         Metodo = method,
         `p-valor` = if (is.na(pval)) NA else signif(pval, 4),
         Nota = trimws(note),
