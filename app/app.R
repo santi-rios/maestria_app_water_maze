@@ -37,7 +37,18 @@ ui <- fluidPage(
           column(6, actionButton("open_group_editor", "Editar grupos (opcional)", class = "btn-sm btn-outline-secondary")),
           column(6, actionButton("clear_uploaded", "Limpiar datos cargados", class = "btn-sm btn-danger"))
         ),
-        tags$small(textOutput("upload_status"))
+        tags$small(textOutput("upload_status")),
+        tags$hr(),
+        tags$div(
+          h5("Cómo cargar y comparar grupos"),
+          tags$ul(
+            tags$li("Suba una tanda de archivos (p. ej., carpeta 'Fluoxetina') y mapee columnas."),
+            tags$li("Luego suba otra tanda (p. ej., 'Ketamina'). La app acumula las tandas en esta sesión."),
+            tags$li("Use 'Editar grupos' para asignar/corregir el Grupo por Individuo si hace falta."),
+            tags$li("'Limpiar datos cargados' reinicia la acumulación (útil para empezar un nuevo análisis)."),
+            tags$li("El botón 'Analizar' usa todos los datos acumulados hasta el momento.")
+          )
+        )
       ),
       conditionalPanel(
         condition = "input.data_source == 'random'",
@@ -189,14 +200,21 @@ ui <- fluidPage(
         tabPanel("Mapa de Calor", 
                  plotOutput("heatmap")
         ),
-        tabPanel("Estadísticas de Resumen", 
+  tabPanel("Estadísticas de Resumen", 
                  wellPanel(
                    fluidRow(
                      column(4, selectInput("test_variable", "Variable a probar", choices = c("Entropía (por individuo)"), selected = "Entropía (por individuo)")),
                      column(4, selectInput("test_method", "Método", choices = c("Auto", "t-test", "ANOVA", "Kruskal-Wallis"), selected = "Auto")),
                      column(4, checkboxGroupInput("test_checks", "Verificar supuestos", choices = c("Normalidad (Shapiro)" = "shapiro", "Varianzas (Levene/Bartlett)" = "variance"), selected = c("shapiro", "variance")))
+                   ),
+                   tags$small(
+                     tags$b("Sobre 'Auto': "),
+                     "si hay 2 grupos ejecuta t-test; si hay más de 2, ejecuta ANOVA.",
+                     " No cambia automáticamente a pruebas no paramétricas; si los supuestos no se cumplen, seleccione 'Kruskal-Wallis'."
                    )
-                 ),
+     ),
+     h4("Pruebas de hipótesis (resumen)"),
+     tableOutput("test_summary_table"),
                  verbatimTextOutput("summary_stats")
         ),
         tabPanel("Acerca de",
@@ -891,45 +909,37 @@ server <- function(input, output, session) {
   summary_data <- calculate_summary_stats(data)
   statistical_tests <- perform_statistical_tests(summary_data)
 
+    # Combined group-level and entropy hypothesis tests
     output$summary_stats <- renderPrint({
+      # Group-level summary and tests
       cat("Estadísticas de Resumen por Grupo:\n")
       cat("==================================\n")
       print(summary_data)
-      cat("\n\nComparación Estadística:\n")
-      cat("========================\n")
-      
+      cat("\n\nComparación Estadística (Distancia/Velocidad):\n")
+      cat("===========================================\n")
       if (statistical_tests$test_type == "t-test") {
         if (!is.null(statistical_tests$distance_test)) {
           cat("\n--- T-test para Distancia Total ---\n")
           print(statistical_tests$distance_test)
         }
-        
         if (!is.null(statistical_tests$velocity_test)) {
           cat("\n--- T-test para Velocidad Promedio ---\n")
           print(statistical_tests$velocity_test)
         }
-        
       } else if (statistical_tests$test_type == "ANOVA") {
         if (!is.null(statistical_tests$distance_test)) {
           cat("\n--- ANOVA para Distancia Total ---\n")
           print(summary(statistical_tests$distance_test))
         }
-        
         if (!is.null(statistical_tests$velocity_test)) {
           cat("\n--- ANOVA para Velocidad Promedio ---\n")
           print(summary(statistical_tests$velocity_test))
         }
       } else {
-        cat("Se necesita más de un grupo para la comparación estadística.")
+        cat("Se necesita más de un grupo para la comparación estadística.\n")
       }
-    })
 
-    # Hypothesis tests on entropy by individual
-    output$summary_stats <- renderPrint({
-      # Keep previous content first
-      cat("Estadísticas de Resumen por Grupo:\n")
-      cat("==================================\n")
-      print(summary_data)
+      # Entropy hypothesis test summary
       cat("\n\nPruebas de hipótesis sobre Entropía (por individuo):\n")
       cat("==================================\n")
       results <- entropy_results()
@@ -984,6 +994,46 @@ server <- function(input, output, session) {
       } else {
         cat("Método no aplicable a la configuración actual.\n")
       }
+    })
+
+    # Summary table with p-values and method used
+    output$test_summary_table <- renderTable({
+      results <- entropy_results()
+      if (is.null(results) || is.null(results$entropy_data) || nrow(results$entropy_data) == 0) return(NULL)
+      ed <- results$entropy_data
+      ed <- ed[is.finite(ed$entropy), ]
+      if (!"Group" %in% names(ed) || length(unique(ed$Group)) < 2) return(NULL)
+      method <- input$test_method
+      auto_used <- FALSE
+      if (identical(method, "Auto")) {
+        method <- if (length(unique(ed$Group)) == 2) "t-test" else "ANOVA"
+        auto_used <- TRUE
+      }
+      pval <- NA_real_
+      note <- ""
+      if (identical(method, "t-test") && length(unique(ed$Group)) == 2) {
+        res <- tryCatch(t.test(entropy ~ Group, data = ed), error = function(e) NULL)
+        if (!is.null(res)) pval <- res$p.value
+      } else if (identical(method, "ANOVA") && length(unique(ed$Group)) >= 2) {
+        fit <- tryCatch(aov(entropy ~ Group, data = ed), error = function(e) NULL)
+        if (!is.null(fit)) {
+          sm <- summary(fit)
+          pval <- tryCatch(sm[[1]][["Pr(>F)"]][1], error = function(e) NA_real_)
+        }
+      } else if (identical(method, "Kruskal-Wallis")) {
+        res <- tryCatch(kruskal.test(entropy ~ Group, data = ed), error = function(e) NULL)
+        if (!is.null(res)) pval <- res$p.value
+      } else {
+        note <- "Método no aplicable con el número de grupos actual"
+      }
+      if (auto_used) note <- paste(note, "(Auto)")
+      data.frame(
+        Variable = "Entropía (por individuo)",
+        Metodo = method,
+        `p-valor` = if (is.na(pval)) NA else signif(pval, 4),
+        Nota = trimws(note),
+        check.names = FALSE
+      )
     })
   })
 }
