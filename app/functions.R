@@ -370,7 +370,12 @@ create_individual_entropy_plots <- function(data, plat_x, plat_y,
   individuals <- unique(paste(data$Group, data$Individual, sep = "_"))
   
   plot_list <- list()
-  entropy_values <- data.frame()
+  entropy_values <- data.frame(
+    Group = character(0),
+    Individual = character(0),
+    entropy = numeric(0),
+    stringsAsFactors = FALSE
+  )
   
   for (ind in individuals) {
     # Extract group and individual
@@ -387,7 +392,7 @@ create_individual_entropy_plots <- function(data, plat_x, plat_y,
     # Calculate entropy
     entropy_val <- calculate_entropy(ind_data$x, ind_data$y, plat_x, plat_y)
     
-    # Calculate covariance matrix for ellipse
+  # Calculate covariance matrix for ellipse
     d_x <- ind_data$x - plat_x
     d_y <- ind_data$y - plat_y
     
@@ -395,6 +400,10 @@ create_individual_entropy_plots <- function(data, plat_x, plat_y,
     ym <- mean(d_y)
     
     cov_matrix <- cov(cbind(d_x, d_y))
+
+  # RMS distance component (mean squared distance to platform)
+  mdist2 <- mean(d_x^2 + d_y^2)
+  rms_r <- sqrt(max(mdist2, 1e-6))
     
     # Create ellipse data
     ellipse_data <- get_ellipse_data(xm + plat_x, ym + plat_y, cov_matrix)
@@ -416,12 +425,14 @@ create_individual_entropy_plots <- function(data, plat_x, plat_y,
                          color = "red", size = 4, alpha = 0.8) +
       ggplot2::labs(
         title = paste0(group_name, " - ", ind_name, "\nEntropía: ", round(entropy_val, 3)),
+        subtitle = "Elipse: 95% covarianza (dirección/dispersion) · Círculo punteado: radio RMS",
         x = "Coordenada X", y = "Coordenada Y"
       ) +
       ggplot2::theme_minimal() +
       ggplot2::coord_fixed() +
       ggplot2::theme(
         plot.title = ggplot2::element_text(size = 10, hjust = 0.5),
+        plot.subtitle = ggplot2::element_text(size = 8, hjust = 0.5, color = "gray40"),
         panel.grid = ggplot2::element_blank(),
         panel.background = ggplot2::element_rect(fill = "white", color = NA)
       )
@@ -432,18 +443,26 @@ create_individual_entropy_plots <- function(data, plat_x, plat_y,
         "path",
         x = wm_centr_x + radio_wm * cos(seq(0, 2*pi, length.out = 100)),
         y = wm_centr_y + radio_wm * sin(seq(0, 2*pi, length.out = 100)),
-        color = "black", linewidth = 0.8, alpha = 0.5
+        color = "black", linewidth = 0.6, alpha = 0.25, linetype = "dotted"
       )
     }
+
+    # Add RMS circle around platform (dashed)
+    p <- p + ggplot2::annotate(
+      "path",
+      x = plat_x + rms_r * cos(seq(0, 2*pi, length.out = 100)),
+      y = plat_y + rms_r * sin(seq(0, 2*pi, length.out = 100)),
+      color = "#E69F00", linewidth = 0.9, alpha = 0.9, linetype = "dashed"
+    )
     
-    plot_list[[ind]] <- p
+  plot_list[[length(plot_list) + 1]] <- p
     
     # Store entropy value
     entropy_values <- rbind(entropy_values, 
                            data.frame(
                              Group = group_name,
                              Individual = ind_name,
-                             Entropy = entropy_val
+                             entropy = entropy_val
                            ))
   }
   

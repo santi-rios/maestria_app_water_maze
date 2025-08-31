@@ -22,23 +22,35 @@ ui <- fluidPage(
   ),
   sidebarLayout(
     sidebarPanel(
-      fileInput("file1", "Subir coordenadas", accept = ".csv", multiple = TRUE),
-  # Dynamic UI to map columns when a file is uploaded
-  uiOutput("column_mapper_ui"),
-      tags$hr(),
-      h5("Generación de Datos Aleatorios"),
-      p("Genera datos simulados con diferentes comportamientos de aprendizaje"),
-      fluidRow(
-        column(8, 
-               numericInput("n_subjects_random", "Sujetos por grupo:", value = 8, min = 1, max = 15, step = 1)
-        ),
-        column(4,
-               br(),
-               actionButton("randomize_data", "Aleatorizar", icon = icon("dice"), 
-                          class = "btn-warning btn-sm", style = "margin-top: 5px;")
-        )
+      h4("Fuente de datos"),
+      radioButtons(
+        "data_source", "Seleccione una fuente:", inline = TRUE,
+        choices = c("Subir archivos CSV" = "upload", "Generar datos aleatorios" = "random"),
+        selected = "upload"
       ),
-      tags$small("Genera nuevos datos simulados con diferentes comportamientos"),
+      conditionalPanel(
+        condition = "input.data_source == 'upload'",
+        fileInput("file1", "Subir coordenadas", accept = ".csv", multiple = TRUE),
+        # Dynamic UI to map columns when a file is uploaded
+  uiOutput("column_mapper_ui"),
+  actionButton("open_group_editor", "Editar grupos (opcional)", class = "btn-sm btn-outline-secondary")
+      ),
+      conditionalPanel(
+        condition = "input.data_source == 'random'",
+        h5("Generación de Datos Aleatorios"),
+        p("Genere datos simulados con diferentes comportamientos de aprendizaje"),
+        fluidRow(
+          column(8, 
+                 numericInput("n_subjects_random", "Sujetos por grupo:", value = 8, min = 1, max = 15, step = 1)
+          ),
+          column(4,
+                 br(),
+                 actionButton("randomize_data", "Aleatorizar", icon = icon("dice"), 
+                            class = "btn-warning btn-sm", style = "margin-top: 5px;")
+          )
+        ),
+        tags$small("Cada clic genera nuevos datos con comportamientos distintos")
+      ),
       tags$hr(),
       h4("Configuración de Arena"),
       checkboxInput("auto_detect", "Detectar automáticamente dimensiones", value = TRUE),
@@ -50,9 +62,12 @@ ui <- fluidPage(
         numericInput("wm_centr_x", "Centro en X del aparato", value = 90.13, step = 0.1),
         numericInput("wm_centr_y", "Centro en Y del aparato", value = 61.3, step = 0.1),
         numericInput("radio_wm", "Radio del aparato", value = 65, step = 0.5),
-        tags$small("Tip: Use la vista previa para verificar que los parámetros son correctos"),
+        tags$small("Los cambios manuales se aplican al presionar 'Actualizar vista previa'."),
         tags$br(),
-        actionButton("copy_detected", "Copiar parámetros detectados", class = "btn-sm btn-outline-secondary")
+        fluidRow(
+          column(6, actionButton("copy_detected", "Copiar parámetros detectados", class = "btn-sm btn-outline-secondary")),
+          column(6, actionButton("update_preview", "Actualizar vista previa", class = "btn-sm btn-primary"))
+        )
       ),
       conditionalPanel(
         condition = "input.auto_detect",
@@ -60,6 +75,7 @@ ui <- fluidPage(
         tags$br(),
         tags$small("Desactive la detección automática para ajustar manualmente.")
       ),
+      checkboxInput("click_set_platform", "Definir plataforma con clic en la vista previa", value = FALSE),
       tags$hr(),
       actionButton("analyze_btn", "Analizar"),
       tags$hr(),
@@ -73,7 +89,7 @@ ui <- fluidPage(
       tabsetPanel(
         tabPanel("Configuración de Arena", 
                  h3("Vista Previa de la Arena"),
-                 plotOutput("arena_preview"),
+                 plotOutput("arena_preview", click = "arena_click"),
                  conditionalPanel(
                    condition = "input.auto_detect",
                    h4("Parámetros Detectados Automáticamente:"),
@@ -119,12 +135,26 @@ ui <- fluidPage(
                      tags$li("Σ = matriz de covarianza de las coordenadas relativas a la plataforma"),
                      tags$li("det(Σ) = determinante de la matriz de covarianza")
                    ),
-                   p("Esta medida cuantifica tanto la dispersión espacial como la variabilidad direccional de la búsqueda.")
+                   p("Esta medida cuantifica tanto la dispersión espacial como la variabilidad direccional de la búsqueda."),
+                   tags$hr(),
+                   h4("Visualización e Interpretación"),
+                   tags$ul(
+                     tags$li(strong("Círculo RMS"), ": círculo punteado centrado en la plataforma con radio √d²; representa la lejanía promedio de la búsqueda."),
+                     tags$li(strong("Elipse de covarianza"), ": elipse al 95% basada en Σ; su tamaño/orientación describe la dirección y dispersión de la trayectoria."),
+                     tags$li(strong("Entropía alta"), ": d² grande y/o elipse grande → búsqueda amplia y desorganizada."),
+                     tags$li(strong("Entropía baja"), ": d² pequeño y elipse compacta → búsqueda precisa y próxima a la plataforma.")
+                   )
                  )
         ),
         tabPanel("Entropía Individual", 
                  h3("Análisis de Entropía por Individuo"),
-                 p("Cada gráfico muestra la trayectoria individual, la elipse de covarianza (azul) y el valor de entropía calculado."),
+                 p("Interpretación rápida:"),
+                 tags$ul(
+                   tags$li("Puntos y trazas: la trayectoria del individuo."),
+                   tags$li("Elipse azul: región donde cae ~95% de la dispersión direccional (covarianza). Más grande/ancha = búsqueda más extendida o direccional."),
+                   tags$li("Círculo punteado gris: radio RMS (raíz del promedio del cuadrado de distancias) respecto a la plataforma. Más grande = exploración más alejada."),
+                   tags$li("Entropía combina ambas: lejanía promedio (RMS) + variabilidad direccional (elipse). Valores altos = búsqueda más desorganizada o alejada de la plataforma.")
+                 ),
                  uiOutput("entropy_plots_ui"),
                  h4("Resumen de Entropía por Grupo"),
                  tableOutput("entropy_summary_table")
@@ -219,6 +249,19 @@ server <- function(input, output, session) {
 
   # Reactive value to store randomly generated data
   random_data <- reactiveVal(NULL)
+  # Reactive value to store group overrides (named vector: Individual -> Group)
+  group_overrides <- reactiveVal(NULL)
+  # Whether user has clicked to set platform
+  platform_override <- reactiveVal(FALSE)
+
+  # Clear random data when switching data source to upload; provide hint when switching to random
+  observeEvent(input$data_source, {
+    if (identical(input$data_source, "upload")) {
+      random_data(NULL)
+    } else if (identical(input$data_source, "random")) {
+      showNotification("Use el botón 'Aleatorizar' para generar datos de ejemplo.", type = "message", duration = 3)
+    }
+  })
 
   # Generate random data when button is clicked
   observeEvent(input$randomize_data, {
@@ -346,32 +389,16 @@ server <- function(input, output, session) {
 
       if (length(all_data) == 0) return(NULL)
       data <- dplyr::bind_rows(all_data)
+      # Apply group overrides if present
+      overrides <- group_overrides()
+      if (!is.null(overrides) && "Individual" %in% names(data)) {
+        idx <- match(data$Individual, names(overrides))
+        repl <- overrides[idx]
+        data$Group <- ifelse(!is.na(repl), repl, data$Group)
+      }
     } else {
-      # No data available - generate default random data
-      cat("No hay datos disponibles, generando datos aleatorios por defecto...\n")
-      new_data <- generate_group_trajectories(
-        n_subjects_per_group = 4,
-        groups = c("Control", "Tratamiento"),
-        n_points = sample(80:150, 1),
-        max_time = sample(30:60, 1)
-      )
-      
-      # Format data to match expected structure
-      formatted_data <- new_data %>%
-        dplyr::rename(
-          time = Time,
-          x = X,
-          y = Y,
-          Individual = Subject
-        ) %>%
-        dplyr::mutate(
-          time = as.numeric(time),
-          x = as.numeric(x),
-          y = as.numeric(y),
-          Group = Treatment  # Add Group column from Treatment
-        )
-      
-      return(formatted_data)
+  # No data available yet
+  return(NULL)
     }
     return(data)
   })
@@ -416,8 +443,8 @@ server <- function(input, output, session) {
         column(6, selectInput("col_y", "Columna Y", choices = cols, selected = guess_y))
       ),
       fluidRow(
-        column(6, selectInput("col_group", "Columna de grupo (si existe)", choices = c("", cols), selected = guess_grp)),
-        column(6, checkboxInput("group_from_filename", "Asignar grupo usando nombre del archivo si falta", value = TRUE))
+  column(6, selectInput("col_group", "Columna de grupo (si existe)", choices = c("", cols), selected = guess_grp)),
+  column(6, checkboxInput("group_from_filename", "Asignar grupo usando nombre del archivo si falta", value = FALSE))
       ),
       textInput("group_label", "Etiqueta de grupo por defecto (si no hay columna)", value = "Grupo")
     )
@@ -432,15 +459,23 @@ server <- function(input, output, session) {
       arena_params$center_x <- detected$center_x
       arena_params$center_y <- detected$center_y
       arena_params$radius <- detected$radius
-      arena_params$platform_x <- detected$platform_x
-      arena_params$platform_y <- detected$platform_y
+      if (!isTRUE(platform_override())) {
+        arena_params$platform_x <- detected$platform_x
+        arena_params$platform_y <- detected$platform_y
+      }
     } else if (!input$auto_detect) {
-      arena_params$center_x <- input$wm_centr_x
-      arena_params$center_y <- input$wm_centr_y
-      arena_params$radius <- input$radio_wm
-      arena_params$platform_x <- input$plat_x
-      arena_params$platform_y <- input$plat_y
+      # Manual mode: wait until user clicks 'Actualizar vista previa'
     }
+  })
+
+  # Apply manual params to preview on demand
+  observeEvent(input$update_preview, {
+    arena_params$center_x <- input$wm_centr_x
+    arena_params$center_y <- input$wm_centr_y
+    arena_params$radius <- input$radio_wm
+    arena_params$platform_x <- input$plat_x
+    arena_params$platform_y <- input$plat_y
+    platform_override(FALSE)
   })
 
   # Copy detected parameters to manual inputs
@@ -457,6 +492,57 @@ server <- function(input, output, session) {
       
       showNotification("Parámetros detectados copiados a los campos manuales", type = "message")
     }
+  })
+
+  # Click-to-set platform directly from preview
+  observeEvent(input$arena_click, {
+    if (isTRUE(input$click_set_platform)) {
+      arena_params$platform_x <- input$arena_click$x
+      arena_params$platform_y <- input$arena_click$y
+      updateNumericInput(session, "plat_x", value = round(input$arena_click$x, 2))
+      updateNumericInput(session, "plat_y", value = round(input$arena_click$y, 2))
+      platform_override(TRUE)
+      showNotification("Plataforma definida por clic.", type = "message", duration = 2)
+    }
+  })
+
+  # Manual group editor modal
+  observeEvent(input$open_group_editor, {
+    data <- getData()
+    if (is.null(data) || !"Individual" %in% names(data)) {
+      showNotification("Cargue datos y defina 'Individual' para editar grupos.", type = "warning")
+      return()
+    }
+    current_map <- data %>% dplyr::distinct(Individual, Group)
+    current_map <- current_map[!duplicated(current_map$Individual), ]
+    lines <- paste(current_map$Individual, current_map$Group, sep = ",")
+    showModal(modalDialog(
+      title = "Editar grupos manualmente",
+      size = "l",
+      easyClose = TRUE,
+      footer = tagList(
+        modalButton("Cancelar"),
+        actionButton("save_group_edits", "Guardar", class = "btn-primary")
+      ),
+      tags$p("Edite el mapeo 'Individual,Grupo' (una línea por individuo). Puede crear nuevos nombres de grupo."),
+      textAreaInput("group_edit_text", NULL, value = paste(lines, collapse = "\n"), rows = min(12, max(6, length(lines))), width = "100%"),
+      tags$small("Formato: Individuo,Grupo. Las líneas vacías se ignoran.")
+    ))
+  })
+
+  observeEvent(input$save_group_edits, {
+    txt <- input$group_edit_text
+    if (is.null(txt) || !nzchar(txt)) { removeModal(); return() }
+    lines <- strsplit(txt, "\n", fixed = TRUE)[[1]]
+    pairs <- strsplit(lines, ",", fixed = TRUE)
+    pairs <- Filter(function(x) length(x) >= 2 && nzchar(trimws(x[1])) && nzchar(trimws(x[2])), pairs)
+    if (length(pairs) == 0) { removeModal(); return() }
+    inds <- vapply(pairs, function(x) trimws(x[1]), character(1))
+    grps <- vapply(pairs, function(x) trimws(x[2]), character(1))
+    ov <- grps; names(ov) <- inds
+    group_overrides(ov)
+    removeModal()
+    showNotification("Mapeo de grupos actualizado.", type = "message")
   })
 
   # Arena preview
@@ -557,32 +643,35 @@ server <- function(input, output, session) {
         p("Intente cargar nuevos datos o generar datos aleatorios.", style = "color: #856404;")
       ))
     }
-    
+
     plots <- results$plots
-    
+
     if (length(plots) <= 6) {
       # Show all plots if 6 or fewer
       plot_outputs <- lapply(seq_along(plots), function(i) {
         plot_name <- paste0("entropy_plot_", i)
         plotOutput(plot_name, height = "300px")
       })
-      
       # Organize in rows of 2
       rows <- split(plot_outputs, ceiling(seq_along(plot_outputs)/2))
       lapply(rows, function(row) {
-        fluidRow(
-          lapply(row, function(plot) {
-            column(6, plot)
-          })
-        )
+        fluidRow(lapply(row, function(plot) column(6, plot)))
       })
     } else {
-      # Too many plots - show message and download option
-      list(
+      # Too many plots - show message and also render first 6 outputs
+      first6 <- 1:6
+      plot_outputs <- lapply(first6, function(i) {
+        plot_name <- paste0("entropy_plot_", i)
+        plotOutput(plot_name, height = "300px")
+      })
+      rows <- split(plot_outputs, ceiling(seq_along(plot_outputs)/2))
+      ui_list <- list(
         h4("Demasiados individuos para mostrar en pantalla"),
         p(paste("Se detectaron", length(plots), "individuos. Use el botón de descarga para obtener todos los gráficos.")),
-        p("Mostrando solo los primeros 6:")
-      )
+        p("Mostrando solo los primeros 6:"))
+      c(ui_list, lapply(rows, function(row) {
+        fluidRow(lapply(row, function(plot) column(6, plot)))
+      }))
     }
   })
 
@@ -611,6 +700,9 @@ server <- function(input, output, session) {
     if (is.null(results)) return(NULL)
     
     entropy_data <- results$entropy_data
+    if (is.null(entropy_data) || nrow(entropy_data) == 0 || !"Group" %in% names(entropy_data)) {
+      return(data.frame(Mensaje = "No hay datos de entropía por individuo disponibles"))
+    }
     
     # Calculate summary statistics by group
     summary_stats <- entropy_data %>%
@@ -637,24 +729,20 @@ server <- function(input, output, session) {
       if (is.null(results)) return()
       
       plots <- results$plots
-      
-      # Create PDF with all plots
+      if (is.null(plots) || length(plots) == 0) return()
+
       pdf(file, width = 12, height = 8)
-      
-      # Arrange plots in grid
       n_plots <- length(plots)
       n_cols <- 2
-      
-      for (i in seq(1, n_plots, by = n_cols * 2)) {
-        # Create page with up to 4 plots
-        page_plots <- plots[i:min(i + 3, n_plots)]
+      step <- max(n_cols * 2, 1)
+      idx_seq <- seq.int(1, n_plots, by = step)
+      for (i in idx_seq) {
+        page_plots <- plots[i:min(i + (step - 1), n_plots)]
         page_plots <- page_plots[!sapply(page_plots, is.null)]
-        
         if (length(page_plots) > 0) {
-          gridExtra::grid.arrange(grobs = page_plots, ncol = 2)
+          gridExtra::grid.arrange(grobs = page_plots, ncol = n_cols)
         }
       }
-      
       dev.off()
     }
   )
@@ -662,6 +750,10 @@ server <- function(input, output, session) {
   # Original entropy analysis (grouped)
   observeEvent(input$analyze_btn, {
     data <- getData()
+    if (is.null(data)) {
+      showNotification("No hay datos para analizar. Cargue archivos o genere datos aleatorios.", type = "warning", duration = 4)
+      return()
+    }
     
     # Debug: print data structure
     cat("Estructura de los datos:\n")
