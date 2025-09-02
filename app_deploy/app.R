@@ -242,7 +242,7 @@ ui <- fluidPage(
                    h5("Detalles e interpretación"),
                    tags$ul(
                      tags$li(strong("Componente radial (d²)"), ": resume la lejanía promedio respecto a la plataforma. Es equivalente al cuadrado del radio RMS (cuyo círculo está dibujado en las figuras)."),
-                     tags$li(strong("Componente direccional (det(Σ))"), ": proviene de la variabilidad y correlación de los desplazamientos (eigenvalores de Σ). Capta si la búsqueda es alargada en una dirección o amplia en todas."),
+                     tags$li(strong("Componente direccional (det(Σ))"), ": proviene de la variabilidad y correlación de los desplazamientos (valores eigen de Σ). Capta si la búsqueda es alargada en una dirección o amplia en todas."),
                      tags$li(strong("Invariancias"), ": H es invariante a rotaciones (usa Σ) y responde a escalas de la arena de forma logarítmica, lo que estabiliza valores ante unidades distintas."),
                      tags$li(strong("Casos límite"), ": si el animal busca sobre la plataforma (d²→0) o sin variabilidad (det(Σ)→0), la fórmula se regulariza para evitar infinitos (se añaden valores mínimos muy pequeños)."),
                      tags$li(strong("Lectura práctica"), ": H alto combina distancia promedio grande y/o gran dispersión direccional; H bajo indica búsqueda precisa y cercana a la plataforma.")
@@ -265,19 +265,6 @@ ui <- fluidPage(
                        tags$li(strong("Normalización por tamaño de arena"), ": Si compara estudios diferentes, normalice las coordenadas al rango [0,1] antes del análisis."),
                        tags$li(strong("Misma duración de prueba"), ": Tiempos de grabación similares entre grupos para evitar sesgos por cantidad de datos.")
                      )),
-                   h5("✅ Cuándo las Comparaciones Son Válidas"),
-                   tags$ul(
-                     tags$li(strong("Mismo laboratorio, mismo setup"), ": Ideal para comparaciones directas."),
-                     tags$li(strong("Protocolos estandarizados"), ": Misma arena, misma cámara, misma resolución, mismo tiempo de prueba."),
-                     tags$li(strong("Datos normalizados"), ": Si usa datos de fuentes diferentes, normalice coordenadas por el tamaño de la arena.")
-                   ),
-                   h5("❌ Cuándo NO Comparar Directamente"),
-                   tags$ul(
-                     tags$li(strong("Diferentes resoluciones de cámara"), ": Píxeles vs. coordenadas físicas sin conversión."),
-                     tags$li(strong("Arenas de diferente tamaño"), ": Sin normalización apropiada."),
-                     tags$li(strong("Diferentes alturas de cámara"), ": Afecta la perspectiva y distorsión."),
-                     tags$li(strong("Tiempos de grabación muy diferentes"), ": >30% de diferencia puede sesgar resultados.")
-                   ),
                    h5("💡 Estrategias de Normalización"),
                    tags$ol(
                      tags$li(strong("Por rango"), ": x_norm = (x - x_min) / (x_max - x_min), igual para y."),
@@ -294,11 +281,11 @@ ui <- fluidPage(
                  h3("🔬 Validación de la Implementación de Entropía", style = "color: #2E8B57;"),
                  
                  tags$div(style = "background-color: #d4edda; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 5px solid #28a745;",
-                   h4("✅ Implementación Validada Científicamente", style = "color: #155724; margin-top: 0;"),
-                   p("Los cálculos de entropía de esta aplicación han sido validados contra los valores de referencia de ", 
-                     strong("Cooke et al. (2020)"), " con resultados excelentes.", style = "margin-bottom: 0; color: #155724;")
-                 ),
-                 
+                   h4("✅ Implementación Validada", style = "color: #155724; margin-top: 0;"),
+                     p("Los cálculos de entropía de esta aplicación han sido validados contra los valores de referencia de ", 
+                     strong(tags$a("Cooke et al. (2020)", href = "https://pubmed.ncbi.nlm.nih.gov/32025289/", target = "_blank"), " (93 pruebas individuales)."), " Conoce más en mi trabajo de tesis (link pendiente).", style = "margin-bottom: 0; color: #155724;")
+                   ),
+                   
                  fluidRow(
                    column(6,
                      h4("📊 Resultados de Validación"),
@@ -373,40 +360,11 @@ ui <- fluidPage(
                        p(strong("Interpretación:"), " Sin diferencia significativa")
                      )
                    )
-                 ),
-                 
-                 tags$hr(),
-                 
-                 h4("📖 Referencias y Metodología"),
-                 tags$div(style = "background-color: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #6c757d;",
-                   p(strong("Datos de referencia:"), " Cooke et al. (2020) - Valores de entropía calculados para trayectorias del Morris Water Maze"),
-                   p(strong("Algoritmo validado:"), " H = log(d²) + 0.5·log(det(Σ)), donde d² es la distancia cuadrática media a la plataforma y Σ es la matriz de covarianza"),
-                   p(strong("Parámetros de validación:"), " Arena circular con centro (54, 53), radio 50, plataforma (50, 50)"),
-                   p(strong("Criterios de éxito:"), " r > 0.8, |bias| < 0.5, p > 0.05 en test de diferencias"),
-                   tags$small("Validación realizada el 31 de agosto de 2025 usando 93 trayectorias independientes de 2 grupos experimentales.")
-                 ),
-                 
-                 tags$div(style = "background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin-top: 20px; border-left: 4px solid #bee5eb;",
-                   h5("💡 Implicaciones para el Usuario", style = "color: #0c5460; margin-top: 0;"),
-                   tags$ul(
-                     tags$li("Los resultados de entropía de esta app son ", strong("científicamente confiables")),
-                     tags$li("Apropiados para ", strong("investigación y publicaciones científicas")),
-                     tags$li("Comparables con ", strong("estudios previos que usen métodos similares")),
-                     tags$li("Válidos tanto para ", strong("valores brutos como normalizados")),
-                     tags$li("Recomendado documentar los ", strong("parámetros de arena utilizados"))
-                   )
                  )
+                 
         ),
         tabPanel("Entropía Individual", 
                  h3("Análisis de Entropía por Individuo"),
-                 div(
-                   class = "alert alert-success",
-                   style = "margin-bottom: 20px;",
-                   tags$i(class = "fas fa-check-circle", style = "color: #28a745; margin-right: 8px;"),
-                   "Algoritmo validado científicamente con ",
-                   tags$strong("r = 0.895"), 
-                   " vs datos originales de Cooke et al. 2020"
-                 ),
                  p("Interpretación rápida:"),
                  tags$ul(
                    tags$li("Puntos y trazas: la trayectoria del individuo."),
@@ -420,14 +378,6 @@ ui <- fluidPage(
         ),
         tabPanel("Entropía Agrupada", 
                  h3("Trayectorias y Análisis de Entropía por Grupo"),
-                 div(
-                   class = "alert alert-success",
-                   style = "margin-bottom: 20px;",
-                   tags$i(class = "fas fa-check-circle", style = "color: #28a745; margin-right: 8px;"),
-                   "Algoritmo validado científicamente con ",
-                   tags$strong("r = 0.895"), 
-                   " vs datos originales de Cooke et al. 2020"
-                 ),
                  fluidRow(
                    column(6, 
                           h4("Trayectorias por Grupo"),
@@ -482,19 +432,26 @@ ui <- fluidPage(
         tabPanel("Acerca de",
                  h3("Información del Software"),
                  tags$div(
-                   h4("Título"),
-                   p(strong("Análisis de Laberinto Acuático de Morris: Aplicación Shiny para Análisis de Entropía Espacial")),
-                   
-                   h4("Autor"),
-                   p(strong("Santiago Ríos"), tags$br(),
-                     "Estudiante de Maestría en Neurociencias", tags$br(),
-                     "Universidad [Nombre de Universidad]", tags$br(),
-                     "Email: santiago.rios@[universidad].edu"),
-                   
+                   h4("Título de Tesis"),
+                   p(strong("Caracterización de los efectos de la Fluoxetina sobre el aprendizaje espacial y la flexibilidad cognitiva en un modelo de estrés crónico en ratón")),
+                   h4("Autor del Código"),
+                     p(strong("Santiago García Ríos"), tags$br(),
+                     "Posgrado en Ciencias Biológicas", tags$br(),
+                     "Universidad Nacional Autónoma de México", tags$br(),
+                     tags$a("https://santi-rios.github.io/", href = "https://santi-rios.github.io/", target = "_blank")),
+                     
                    h4("Cómo Citar"),
-                   tags$div(style = "background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 10px 0;",
-                     p(strong("Formato APA:")), 
-                     p("Ríos, S. (2025). Análisis de Laberinto Acuático de Morris: Aplicación Shiny para Análisis de Entropía Espacial [Software]. Universidad [Nombre]. https://github.com/santi-rios/maestria_app_water_maze")
+                   tags$div(
+                     style = "background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 10px 0;",
+                     p(strong("Formato APA:")),
+                     p(
+                       "Garcia-Ríos, S., ",
+                       tags$span("Martínez-Canabal, A.", style = "font-size: 6px;"),
+                       " (2025). Caracterización de los efectos de la Fluoxetina sobre el",
+                       " aprendizaje espacial y la flexibilidad cognitiva en un modelo de",
+                       " estrés crónico en ratón. (Tesis de Maestría). Universidad Nacional",
+                       " Autónoma de México, México"
+                     )
                    ),
                    
                    h4("Descripción"),
@@ -975,7 +932,11 @@ server <- function(input, output, session) {
             title = "Grupos de Trayectorias",
             title.position = "top",
             title.hjust = 0.5,
-            order = 1
+            order = 1,
+            override.aes = list(
+              size = 4,     # Increased size of legend dots
+              alpha = 0.8   # Higher alpha for better visibility
+            )
           ),
           shape = ggplot2::guide_legend(
             title = "Puntos de Referencia",

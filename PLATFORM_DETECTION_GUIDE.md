@@ -155,3 +155,4 @@ Principio: Prueba múltiples métodos y selecciona el mejor
 - **Robusto:** Fallbacks múltiples implementados
 
 ¿Te gustaría probar específicamente el método de "Punto Final" con tus datos problemáticos?
+ 

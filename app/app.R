@@ -242,7 +242,7 @@ ui <- fluidPage(
                    h5("Detalles e interpretación"),
                    tags$ul(
                      tags$li(strong("Componente radial (d²)"), ": resume la lejanía promedio respecto a la plataforma. Es equivalente al cuadrado del radio RMS (cuyo círculo está dibujado en las figuras)."),
-                     tags$li(strong("Componente direccional (det(Σ))"), ": proviene de la variabilidad y correlación de los desplazamientos (eigenvalores de Σ). Capta si la búsqueda es alargada en una dirección o amplia en todas."),
+                     tags$li(strong("Componente direccional (det(Σ))"), ": proviene de la variabilidad y correlación de los desplazamientos (valores eigen de Σ). Capta si la búsqueda es alargada en una dirección o amplia en todas."),
                      tags$li(strong("Invariancias"), ": H es invariante a rotaciones (usa Σ) y responde a escalas de la arena de forma logarítmica, lo que estabiliza valores ante unidades distintas."),
                      tags$li(strong("Casos límite"), ": si el animal busca sobre la plataforma (d²→0) o sin variabilidad (det(Σ)→0), la fórmula se regulariza para evitar infinitos (se añaden valores mínimos muy pequeños)."),
                      tags$li(strong("Lectura práctica"), ": H alto combina distancia promedio grande y/o gran dispersión direccional; H bajo indica búsqueda precisa y cercana a la plataforma.")
@@ -680,7 +680,7 @@ server <- function(input, output, session) {
         c_ind  <- resolve_col(input$col_individual)
         c_grp  <- resolve_col(input$col_group)
 
-        missing_cols <- c()
+        missing_cols <- cc()
         if (is.na(c_time)) missing_cols <- c(missing_cols, input$col_time)
         if (is.na(c_x))    missing_cols <- c(missing_cols, input$col_x)
         if (is.na(c_y))    missing_cols <- c(missing_cols, input$col_y)
@@ -921,7 +921,7 @@ server <- function(input, output, session) {
     } else {
       # Create base plot with trajectory data
       p <- ggplot2::ggplot(data, ggplot2::aes(x = x, y = y, color = Group)) +
-        ggplot2::geom_point(alpha = 0.3, size = 0.5) +
+        ggplot2::geom_point(alpha = 0.6, size = 1, aes(shape = Group)) +
         # Arena boundary
         ggplot2::annotate("path",
                          x = arena_params$center_x + arena_params$radius * cos(seq(0, 2*pi, length.out = 100)),
@@ -975,7 +975,11 @@ server <- function(input, output, session) {
             title = "Grupos de Trayectorias",
             title.position = "top",
             title.hjust = 0.5,
-            order = 1
+            order = 1,
+            override.aes = list(
+              size = 4,     # Increased size of legend dots
+              alpha = 0.8   # Higher alpha for better visibility
+            )
           ),
           shape = ggplot2::guide_legend(
             title = "Puntos de Referencia",
