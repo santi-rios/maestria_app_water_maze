@@ -18,12 +18,10 @@ ui <- fluidPage(
       h1("Análisis de Laberinto Acuático de Morris"),
       h4("Aplicación para Análisis de Entropía Espacial", style = "color: #6c757d; margin-top: -10px;"),
       div(style = "margin-top: 10px; margin-bottom: 10px;",
-        span("✅ Validado Científicamente", 
-             style = "background-color: #d4edda; color: #155724; padding: 4px 8px; border-radius: 15px; font-size: 12px; border: 1px solid #c3e6cb;"),
-        span(" | r = 0.895 vs Cooke 2020", 
-             style = "color: #6c757d; font-size: 12px; margin-left: 5px;")
+        span("Visita la pestaña de metodología para conocer más", 
+             style = "background-color: #d4edda; color: #155724; padding: 4px 8px; border-radius: 15px; font-size: 12px; border: 1px solid #c3e6cb;")
       ),
-      p("Por Santiago Ríos - Maestría en Neurociencias", style = "color: #6c757d; font-size: 14px; margin-top: -5px;")
+      p("Por Santiago Ríos - ", tags$a("Posgrado en Ciencias Biológicas, UNAM", href = "https://pcbiol.posgrado.unam.mx/", target = "_blank"), style = "color: #6c757d; font-size: 14px; margin-top: -5px;")
     )
   ),
   sidebarLayout(
@@ -31,8 +29,8 @@ ui <- fluidPage(
       h4("Fuente de datos"),
       radioButtons(
         "data_source", "Seleccione una fuente:", inline = TRUE,
-        choices = c("Subir archivos CSV" = "upload", "Generar datos aleatorios" = "random"),
-        selected = "upload"
+        choices = c("Subir archivos CSV" = "upload", "Generar datos de ejemplo" = "random"),
+        selected = "random"
       ),
       conditionalPanel(
         condition = "input.data_source == 'upload'",
@@ -48,18 +46,18 @@ ui <- fluidPage(
         tags$div(
           h5("Cómo cargar y comparar grupos"),
           tags$ul(
-            tags$li("Suba una tanda de archivos (p. ej., carpeta 'Fluoxetina') y mapee columnas."),
-            tags$li("Luego suba otra tanda (p. ej., 'Ketamina'). La app acumula las tandas en esta sesión."),
-            tags$li("Use 'Editar grupos' para asignar/corregir el Grupo por Individuo si hace falta."),
-            tags$li("'Limpiar datos cargados' reinicia la acumulación (útil para empezar un nuevo análisis)."),
+            tags$li("Sube los datos de coordenadas de un grupo (p. ej., carpeta 'Control') y selecciona las columnas que correspondan al tiempo y ejes `x` y `y` (campos obligatorios)."),
+            tags$li("Haz click en el botón Analizar cuando hayas ajustado las coordenadas del laberinto. Los límites del laberinto NO influyen en la entropía, solo la localización del annulus y las coordenadas."),
+            tags$li("Luego puedes subir otro suba otra tanda (p. ej., 'Fluoxetina'). Esto permitirá hacer comparaciones."),
+            tags$li("Use 'Editar grupos' para asignar/corregir el Grupo/Tratamiento por cada archivo csv si hace falta."),
             tags$li("El botón 'Analizar' usa todos los datos acumulados hasta el momento.")
           )
         )
       ),
       conditionalPanel(
         condition = "input.data_source == 'random'",
-        h5("Generación de Datos Aleatorios"),
-        p("Genere datos simulados con diferentes comportamientos de aprendizaje"),
+        h5("Simulación de Datos"),
+        p("Genera datos simulados con diferentes comportamientos de aprendizaje para explorar la aplicación y ver cómo cambian los valores de entropía"),
         fluidRow(
           column(8, 
                  numericInput("n_subjects_random", "Sujetos por grupo:", value = 8, min = 1, max = 15, step = 1)
@@ -72,11 +70,45 @@ ui <- fluidPage(
         ),
   sliderInput("bias_control", "Aprendizaje Control (sesgo)", min = 0.002, max = 0.05, value = 0.015, step = 0.001),
   sliderInput("bias_tratamiento", "Aprendizaje Tratamiento (sesgo)", min = 0.002, max = 0.05, value = 0.006, step = 0.001),
-        tags$small("Cada clic genera nuevos datos con comportamientos distintos")
+        tags$small("En cada paso, el animal se mueve hacia la plataforma según el sesgo"),
+        tags$br(),
+        tags$div(
+          style = "background-color: #e8f4f8; padding: 8px; border-radius: 4px; margin-top: 8px;",
+          tags$small(
+            tags$strong("Nota:"), " Algunos puntos simulados pueden aparecer fuera del círculo de la arena. ",
+            "Esto es normal en la simulación y no afecta el cálculo de entropía, ya que la entropía se basa en la ",
+            "distancia a la plataforma y variabilidad direccional, no en los límites físicos del laberinto."
+          )
+        )
       ),
       tags$hr(),
       h4("Configuración de Arena"),
       checkboxInput("auto_detect", "Detectar automáticamente dimensiones", value = TRUE),
+      conditionalPanel(
+        condition = "input.auto_detect",
+        h5("Método de Detección de Plataforma:"),
+        selectInput("platform_detection_method", "",
+                   choices = c(
+                     "Automático (recomendado)" = "auto",
+                     "Velocidad mínima (método tradicional)" = "velocity", 
+                     "Punto final más frecuente (video termina en plataforma)" = "endpoint",
+                     "Densidad máxima (zona con más puntos)" = "density"
+                   ),
+                   selected = "auto"),
+        tags$small("El método automático prueba velocidad mínima primero, luego punto final si falla."),
+        tags$br(),
+        tags$small("Seleccione 'Punto final' si su protocolo detiene el video al llegar a la plataforma."),
+        tags$br(),
+        tags$div(
+          style = "background-color: #fff3cd; padding: 8px; border-radius: 4px; margin-top: 8px;",
+          tags$small(
+            tags$strong("💡 Guía de métodos:"), tags$br(),
+            tags$strong("Velocidad mínima:"), " funciona cuando animales pasan tiempo en plataforma", tags$br(),
+            tags$strong("Punto final:"), " ideal para videos que terminan al encontrar plataforma", tags$br(), 
+            tags$strong("Densidad máxima:"), " busca zona donde animales pasan más tiempo"
+          )
+        )
+      ),
       conditionalPanel(
         condition = "!input.auto_detect",
         h5("Parámetros Manuales:"),
@@ -93,7 +125,7 @@ ui <- fluidPage(
         )
       ),
       conditionalPanel(
-        condition = "input.auto_detect",
+        condition = "!input.auto_detect",
         tags$small("Los parámetros se detectan automáticamente basándose en los datos cargados."),
         tags$br(),
         tags$small("Desactive la detección automática para ajustar manualmente.")
@@ -115,7 +147,7 @@ ui <- fluidPage(
     mainPanel(
       tabsetPanel(
         tabPanel("Configuración de Arena", 
-                 h3("Vista Previa de la Arena"),
+                 h3("Vista Previa del Laberinto Acuático"),
                  plotOutput("arena_preview", click = "arena_click"),
                  conditionalPanel(
                    condition = "input.auto_detect",
@@ -126,14 +158,14 @@ ui <- fluidPage(
         tabPanel("Metodología",
                  h3("Detección Automática de Parámetros"),
                  tags$div(
-                   h4("1. Centro de la Arena"),
+                   h4("1. Centro del laberinto acuático"),
                    p("El centro se calcula como el punto medio de los rangos de coordenadas:"),
                    tags$code("center_x = (mínimo_x + máximo_x) / 2"),
                    tags$br(),
                    tags$code("center_y = (mínimo_y + máximo_y) / 2"),
-                   p("Este método asume que los datos están distribuidos simétricamente alrededor del centro de la arena."),
+                   p("NOTA: Este método asume que los datos están distribuidos simétricamente alrededor del centro de la arena."),
                    
-                   h4("2. Radio de la Arena"),
+                   h4("2. Radio del laberinto"),
                    p("El radio se estima utilizando el percentil 95 de las distancias desde el centro:"),
                    tags$code("distancias = √((x - center_x)² + (y - center_y)²)"),
                    tags$br(),
@@ -141,7 +173,9 @@ ui <- fluidPage(
                    p("El uso del percentil 95 permite evitar outliers que podrían estar fuera de la arena."),
                    
                    h4("3. Detección de Plataforma"),
-                   p("La plataforma se detecta mediante un algoritmo de análisis de movimiento:"),
+                   p("La aplicación ofrece múltiples métodos de detección de plataforma para adaptarse a diferentes protocolos experimentales:"),
+                   
+                   h5("🔍 Método de Velocidad Mínima (tradicional)"),
                    tags$ol(
                      tags$li("Se divide el espacio en una grilla de 20×20 celdas"),
                      tags$li("Para cada celda se calcula:"),
@@ -150,6 +184,48 @@ ui <- fluidPage(
                        tags$li("Número de puntos en la celda")
                      ),
                      tags$li("La plataforma se identifica como la celda con menor velocidad promedio y al menos 5 puntos")
+                   ),
+                   p(strong("Ideal para:"), " protocolos donde los animales permanecen en la plataforma por un tiempo."),
+                   p(strong("Limitación:"), " falla cuando el video se detiene inmediatamente al llegar a la plataforma."),
+                   
+                   h5("🎯 Método de Punto Final Más Frecuente"),
+                   tags$ol(
+                     tags$li("Extrae el punto final de cada trayectoria individual"),
+                     tags$li("Agrupa puntos finales por proximidad espacial"),
+                     tags$li("Identifica el cluster más grande de puntos finales"),
+                     tags$li("Calcula el centroide del cluster como ubicación de plataforma")
+                   ),
+                   p(strong("Ideal para:"), " protocolos donde el video termina cuando el animal encuentra la plataforma."),
+                   p(strong("Ventaja:"), " no depende del tiempo pasado en la plataforma."),
+                   
+                   h5("📊 Método de Densidad Máxima"),
+                   tags$ol(
+                     tags$li("Divide el espacio en una grilla fina (25×25 celdas)"),
+                     tags$li("Cuenta el número total de puntos en cada celda"),
+                     tags$li("Identifica el 1% de celdas con mayor densidad"),
+                     tags$li("Calcula el centroide ponderado por densidad")
+                   ),
+                   p(strong("Ideal para:"), " detectar zonas donde los animales pasan más tiempo."),
+                   p(strong("Ventaja:"), " robusto ante ruido en las coordenadas."),
+                   
+                   h5("🤖 Método Automático (recomendado)"),
+                   p("Prueba múltiples métodos en secuencia y selecciona el mejor resultado:"),
+                   tags$ol(
+                     tags$li("Intenta velocidad mínima primero"),
+                     tags$li("Si falla, prueba punto final más frecuente"),
+                     tags$li("Si falla, prueba densidad máxima"),
+                     tags$li("Como último recurso, usa el centro de la arena")
+                   ),
+                   
+                   tags$div(
+                     style = "background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 10px 0;",
+                     h5("💡 Recomendaciones de Uso", style = "margin-top: 0;"),
+                     tags$ul(
+                       tags$li(strong("Videos completos:"), " use 'Automático' o 'Velocidad mínima'"),
+                       tags$li(strong("Videos que terminan en plataforma:"), " use 'Punto final más frecuente'"),
+                       tags$li(strong("Datos ruidosos:"), " use 'Densidad máxima'"),
+                       tags$li(strong("Casos difíciles:"), " compare varios métodos manualmente")
+                     )
                    ),
                    p("Principio: Los animales tienden a moverse menos cuando están en la plataforma."),
                    
@@ -735,7 +811,8 @@ server <- function(input, output, session) {
   observe({
     data <- getData()
     if (!is.null(data) && input$auto_detect) {
-      detected <- auto_detect_arena(data)
+      # Use enhanced detection with user-selected method
+      detected <- auto_detect_arena_enhanced(data, detection_method = input$platform_detection_method)
       
       arena_params$center_x <- detected$center_x
       arena_params$center_y <- detected$center_y
@@ -744,6 +821,10 @@ server <- function(input, output, session) {
         arena_params$platform_x <- detected$platform_x
         arena_params$platform_y <- detected$platform_y
       }
+      
+      # Store detection info for display
+      arena_params$detection_method <- detected$detection_method
+      arena_params$detection_info <- detected$detection_info
     } else if (!input$auto_detect) {
       # Manual mode: wait until user clicks 'Actualizar vista previa'
     }
@@ -763,7 +844,7 @@ server <- function(input, output, session) {
   observeEvent(input$copy_detected, {
     data <- getData()
     if (!is.null(data)) {
-      detected <- auto_detect_arena(data)
+      detected <- auto_detect_arena_enhanced(data, detection_method = input$platform_detection_method)
       
       updateNumericInput(session, "plat_x", value = round(detected$platform_x, 2))
       updateNumericInput(session, "plat_y", value = round(detected$platform_y, 2))
@@ -838,6 +919,7 @@ server <- function(input, output, session) {
         ggplot2::xlim(-1, 1) +
         ggplot2::ylim(-1, 1)
     } else {
+      # Create base plot with trajectory data
       p <- ggplot2::ggplot(data, ggplot2::aes(x = x, y = y, color = Group)) +
         ggplot2::geom_point(alpha = 0.3, size = 0.5) +
         # Arena boundary
@@ -845,18 +927,70 @@ server <- function(input, output, session) {
                          x = arena_params$center_x + arena_params$radius * cos(seq(0, 2*pi, length.out = 100)),
                          y = arena_params$center_y + arena_params$radius * sin(seq(0, 2*pi, length.out = 100)),
                          color = "black", linewidth = 1.2) +
-        # Platform
-        ggplot2::geom_point(x = arena_params$platform_x, y = arena_params$platform_y,
-                           color = "red", size = 6, alpha = 0.8) +
-        # Center point
-        ggplot2::geom_point(x = arena_params$center_x, y = arena_params$center_y,
-                           color = "blue", size = 4, alpha = 0.8) +
-        ggplot2::labs(title = "Vista Previa de la Arena",
-                     subtitle = "Puntos rojos: plataforma, Puntos azules: centro, Círculo negro: límite de arena",
-                     x = "Coordenada X", y = "Coordenada Y") +
-        ggplot2::theme_minimal() +
         ggplot2::coord_fixed() +
+        ggplot2::theme_minimal() +
         ggplot2::theme(legend.position = "bottom")
+      
+      # Add platform and center as separate layers for legend control
+      # Create dummy data for platform and center legends
+      legend_data <- data.frame(
+        x = c(arena_params$platform_x, arena_params$center_x),
+        y = c(arena_params$platform_y, arena_params$center_y),
+        type = c("Plataforma", "Centro de Arena"),
+        stringsAsFactors = FALSE
+      )
+      
+      # Add platform and center points with proper legends
+      p <- p +
+        ggplot2::geom_point(data = legend_data[legend_data$type == "Plataforma", ],
+                           ggplot2::aes(x = x, y = y, shape = type), 
+                           color = "red", size = 6, alpha = 0.8, inherit.aes = FALSE) +
+        ggplot2::geom_point(data = legend_data[legend_data$type == "Centro de Arena", ],
+                           ggplot2::aes(x = x, y = y, shape = type), 
+                           color = "blue", size = 4, alpha = 0.8, inherit.aes = FALSE) +
+        ggplot2::scale_shape_manual(
+          name = "Puntos de Referencia",
+          values = c("Plataforma" = 15, "Centro de Arena" = 16),
+          guide = ggplot2::guide_legend(
+            title.position = "top",
+            title.hjust = 0.5,
+            override.aes = list(
+              color = c("red", "blue"),
+              size = c(4, 3),
+              alpha = 1
+            )
+          )
+        ) +
+        ggplot2::labs(
+          title = "Vista Previa de la Arena del Laberinto Acuático",
+          subtitle = paste0("Radio: ", round(arena_params$radius, 1), 
+                           " | Centro: (", round(arena_params$center_x, 1), ", ", round(arena_params$center_y, 1), ")",
+                           " | Plataforma: (", round(arena_params$platform_x, 1), ", ", round(arena_params$platform_y, 1), ")"),
+          x = "Coordenada X", 
+          y = "Coordenada Y",
+          color = "Grupos de Trayectorias"
+        ) +
+        ggplot2::guides(
+          color = ggplot2::guide_legend(
+            title = "Grupos de Trayectorias",
+            title.position = "top",
+            title.hjust = 0.5,
+            order = 1
+          ),
+          shape = ggplot2::guide_legend(
+            title = "Puntos de Referencia",
+            title.position = "top", 
+            title.hjust = 0.5,
+            order = 2
+          )
+        ) +
+        ggplot2::theme(
+          legend.position = "bottom",
+          legend.box = "horizontal",
+          legend.margin = ggplot2::margin(t = 10),
+          plot.title = ggplot2::element_text(hjust = 0.5, face = "bold"),
+          plot.subtitle = ggplot2::element_text(hjust = 0.5, color = "gray60", size = 10)
+        )
       
       return(p)
     }
@@ -869,16 +1003,42 @@ server <- function(input, output, session) {
       return(NULL)
     }
     
-    data.frame(
-      Parámetro = c("Centro X", "Centro Y", "Radio", "Plataforma X", "Plataforma Y"),
+    # Get method description
+    method_desc <- switch(arena_params$detection_method %||% "unknown",
+      "velocity_minimum" = "Velocidad mínima",
+      "endpoint_cluster" = "Punto final más frecuente", 
+      "density" = "Densidad máxima",
+      "fallback_center" = "Centro (fallback)",
+      "Método desconocido"
+    )
+    
+    params_table <- data.frame(
+      Parámetro = c("Centro X", "Centro Y", "Radio", "Plataforma X", "Plataforma Y", "Método Detección"),
       Valor = c(
         round(arena_params$center_x, 2),
         round(arena_params$center_y, 2),
         round(arena_params$radius, 2),
         round(arena_params$platform_x, 2),
-        round(arena_params$platform_y, 2)
-      )
+        round(arena_params$platform_y, 2),
+        method_desc
+      ),
+      stringsAsFactors = FALSE
     )
+    
+    # Add additional info if available
+    if (!is.null(arena_params$detection_info)) {
+      info <- arena_params$detection_info
+      if ("cluster_size" %in% names(info)) {
+        params_table <- rbind(params_table, 
+          data.frame(Parámetro = "Tamaño Cluster", Valor = info$cluster_size, stringsAsFactors = FALSE))
+      }
+      if ("max_density" %in% names(info)) {
+        params_table <- rbind(params_table,
+          data.frame(Parámetro = "Densidad Máx.", Valor = round(info$max_density, 1), stringsAsFactors = FALSE))
+      }
+    }
+    
+    return(params_table)
   })
 
   # Individual entropy analysis

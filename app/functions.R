@@ -586,6 +586,175 @@ auto_detect_arena <- function(data) {
     radius = radius,
     platform_x = platform_x,
     platform_y = platform_y,
-    data_bounds = list(x_range = x_range, y_range = y_range)
+    data_bounds = list(x_range = x_range, y_range = y_range),
+    detection_method = "velocity_minimum"
+  ))
+}
+
+#' Alternative platform detection methods
+#' These methods provide different approaches for various experimental protocols
+
+#' Detect platform based on endpoint clustering
+#' Ideal for protocols where video stops when animal reaches platform
+detect_platform_endpoint <- function(data) {
+  if (!"Individual" %in% names(data)) return(NULL)
+  
+  # Get endpoints from each individual
+  endpoints <- data %>%
+    dplyr::group_by(.data$Individual) %>%
+    dplyr::arrange(.data$time) %>%
+    dplyr::slice_tail(n = 1) %>%
+    dplyr::ungroup()
+  
+  if (nrow(endpoints) < 2) return(NULL)
+  
+  # Simple clustering of endpoints
+  coords <- endpoints[, c("x", "y")]
+  distances_matrix <- as.matrix(dist(coords))
+  threshold <- quantile(distances_matrix[upper.tri(distances_matrix)], 0.3, na.rm = TRUE)
+  
+  # Find point with most neighbors
+  n_points <- nrow(coords)
+  neighbor_counts <- numeric(n_points)
+  
+  for (i in 1:n_points) {
+    distances <- sqrt((coords$x - coords$x[i])^2 + (coords$y - coords$y[i])^2)
+    neighbor_counts[i] <- sum(distances <= threshold)
+  }
+  
+  best_idx <- which.max(neighbor_counts)
+  
+  if (neighbor_counts[best_idx] >= 3) {
+    center_point <- coords[best_idx, ]
+    distances <- sqrt((coords$x - center_point$x)^2 + (coords$y - center_point$y)^2)
+    cluster_points <- coords[distances <= threshold, ]
+    
+    return(list(
+      x = mean(cluster_points$x),
+      y = mean(cluster_points$y),
+      method = "endpoint_cluster",
+      cluster_size = nrow(cluster_points)
+    ))
+  }
+  
+  return(NULL)
+}
+
+#' Detect platform based on maximum density
+#' Works well when animals spend time on platform
+detect_platform_density <- function(data, grid_resolution = 25) {
+  x_range <- range(data$x, na.rm = TRUE)
+  y_range <- range(data$y, na.rm = TRUE)
+  
+  x_breaks <- seq(x_range[1], x_range[2], length.out = grid_resolution)
+  y_breaks <- seq(y_range[1], y_range[2], length.out = grid_resolution)
+  
+  data$x_bin <- cut(data$x, breaks = x_breaks, include.lowest = TRUE, labels = FALSE)
+  data$y_bin <- cut(data$y, breaks = y_breaks, include.lowest = TRUE, labels = FALSE)
+  
+  density_grid <- data %>%
+    dplyr::filter(!is.na(.data$x_bin), !is.na(.data$y_bin)) %>%
+    dplyr::group_by(.data$x_bin, .data$y_bin) %>%
+    dplyr::summarise(
+      count = dplyr::n(),
+      avg_x = mean(.data$x, na.rm = TRUE),
+      avg_y = mean(.data$y, na.rm = TRUE),
+      .groups = 'drop'
+    ) %>%
+    dplyr::arrange(dplyr::desc(.data$count))
+  
+  if (nrow(density_grid) > 0) {
+    # Take top 1% of densest cells and average
+    top_cells <- utils::head(density_grid, max(1, round(nrow(density_grid) * 0.01)))
+    platform_x <- stats::weighted.mean(top_cells$avg_x, top_cells$count)
+    platform_y <- stats::weighted.mean(top_cells$avg_y, top_cells$count)
+    
+    return(list(
+      x = platform_x,
+      y = platform_y,
+      method = "density",
+      max_density = max(density_grid$count)
+    ))
+  }
+  
+  return(NULL)
+}
+
+#' Enhanced auto-detection with multiple methods
+#' Combines different detection approaches for robustness
+auto_detect_arena_enhanced <- function(data, detection_method = "auto") {
+  # Basic arena parameters (same as original)
+  x_range <- range(data$x, na.rm = TRUE)
+  y_range <- range(data$y, na.rm = TRUE)
+  center_x <- mean(x_range)
+  center_y <- mean(y_range)
+  distances <- sqrt((data$x - center_x)^2 + (data$y - center_y)^2)
+  radius <- quantile(distances, 0.95, na.rm = TRUE)
+  
+  # Platform detection with multiple methods
+  platform_result <- NULL
+  
+  if (detection_method == "auto" || detection_method == "velocity") {
+    # Original velocity method
+    if ("time" %in% names(data)) {
+      data$distance_from_prev <- c(0, sqrt(diff(data$x)^2 + diff(data$y)^2))
+      
+      grid_size <- 20
+      x_breaks <- seq(x_range[1], x_range[2], length.out = grid_size)
+      y_breaks <- seq(y_range[1], y_range[2], length.out = grid_size)
+      
+      data$x_bin <- cut(data$x, breaks = x_breaks, include.lowest = TRUE)
+      data$y_bin <- cut(data$y, breaks = y_breaks, include.lowest = TRUE)
+      
+      platform_area <- data %>%
+        dplyr::group_by(.data$x_bin, .data$y_bin) %>%
+        dplyr::summarise(
+          avg_movement = mean(.data$distance_from_prev, na.rm = TRUE),
+          count = dplyr::n(),
+          avg_x = mean(.data$x, na.rm = TRUE),
+          avg_y = mean(.data$y, na.rm = TRUE),
+          .groups = 'drop'
+        ) %>%
+        dplyr::filter(.data$count >= 5) %>%
+        dplyr::arrange(.data$avg_movement)
+      
+      if (nrow(platform_area) > 0) {
+        platform_result <- list(
+          x = platform_area$avg_x[1],
+          y = platform_area$avg_y[1],
+          method = "velocity_minimum"
+        )
+      }
+    }
+  }
+  
+  # Try endpoint method if velocity failed or specifically requested
+  if ((is.null(platform_result) && detection_method == "auto") || detection_method == "endpoint") {
+    platform_result <- detect_platform_endpoint(data)
+  }
+  
+  # Try density method if others failed or specifically requested
+  if ((is.null(platform_result) && detection_method == "auto") || detection_method == "density") {
+    platform_result <- detect_platform_density(data)
+  }
+  
+  # Fallback to center if all methods failed
+  if (is.null(platform_result)) {
+    platform_result <- list(
+      x = center_x,
+      y = center_y,
+      method = "fallback_center"
+    )
+  }
+  
+  return(list(
+    center_x = center_x,
+    center_y = center_y,
+    radius = radius,
+    platform_x = platform_result$x,
+    platform_y = platform_result$y,
+    data_bounds = list(x_range = x_range, y_range = y_range),
+    detection_method = platform_result$method,
+    detection_info = platform_result
   ))
 }
