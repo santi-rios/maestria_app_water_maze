@@ -20,6 +20,11 @@ generate_group_trajectories <- function(n_subjects_per_group = 8,
   for (g in groups) {
     for (s in seq_len(n_subjects_per_group)) {
       subj_id <- paste0(g, "_", sprintf("%02d", s))
+      
+      # Each subject gets different trajectory length (like real data)
+      subj_n_points <- sample(60:180, 1)
+      subj_max_time <- sample(25:60, 1)
+      
       # Platform differs slightly by group to simulate bias
       # Use safer radius to ensure platform stays within bounds
       plat_ang <- if (g == groups[1]) pi/3 else 5*pi/4
@@ -34,14 +39,14 @@ generate_group_trajectories <- function(n_subjects_per_group = 8,
         plat_y <- center_y + plat_r * sin(plat_ang)
       }
 
-      t <- seq(0, max_time, length.out = n_points)
+      t <- seq(0, subj_max_time, length.out = subj_n_points)
       # Radial tendency: better learners drift toward platform faster
       drift_strength <- if (g == groups[1]) drift_control else drift_treatment
-      x <- numeric(n_points)
-      y <- numeric(n_points)
+      x <- numeric(subj_n_points)
+      y <- numeric(subj_n_points)
       x[1] <- center_x + runif(1, -radius/2, radius/2)
       y[1] <- center_y + runif(1, -radius/2, radius/2)
-      for (i in 2:n_points) {
+      for (i in 2:subj_n_points) {
         vx <- drift_strength * (plat_x - x[i-1]) + rnorm(1, 0, radius*0.04)
         vy <- drift_strength * (plat_y - y[i-1]) + rnorm(1, 0, radius*0.04)
         x[i] <- x[i-1] + vx

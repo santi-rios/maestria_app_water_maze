@@ -12,21 +12,50 @@ source("simulate_data.R")
 
 # Define UI for app
 ui <- fluidPage(
-  theme = bs_theme(version = 4, bootswatch = "minty"),
+  theme = bs_theme(
+    version = 4, 
+    bg = "#fefefe", 
+    fg = "#2c3e50",
+    primary = "#8e44ad",
+    secondary = "#9b59b6", 
+    success = "#27ae60",
+    info = "#3498db",
+    warning = "#f39c12",
+    danger = "#e74c3c",
+    base_font = font_google("Inter"),
+    heading_font = font_google("Poppins")
+  ),
   titlePanel(
     div(
-      h1("Análisis de Laberinto Acuático de Morris"),
-      h4("Aplicación para Análisis de Entropía Espacial", style = "color: #6c757d; margin-top: -10px;"),
+      h1("Análisis de Laberinto Acuático de Morris", 
+         style = "background: linear-gradient(135deg, #8e44ad, #9b59b6); 
+                  background-clip: text; 
+                  -webkit-background-clip: text; 
+                  -webkit-text-fill-color: transparent; 
+                  font-weight: bold;"),
+      h4("Aplicación para Análisis de Entropía Espacial", 
+         style = "color: #6c757d; margin-top: -10px;"),
       div(style = "margin-top: 10px; margin-bottom: 10px;",
         span("Visita la pestaña de metodología para conocer más", 
-             style = "background-color: #d4edda; color: #155724; padding: 4px 8px; border-radius: 15px; font-size: 12px; border: 1px solid #c3e6cb;")
+             style = "background: linear-gradient(135deg, #e1bee7, #ce93d8); 
+                      color: #4a148c; 
+                      padding: 6px 12px; 
+                      border-radius: 20px; 
+                      font-size: 12px; 
+                      border: 1px solid #ba68c8; 
+                      font-weight: 500;")
       ),
-      p("Por Santiago Ríos - ", tags$a("Posgrado en Ciencias Biológicas, UNAM", href = "https://pcbiol.posgrado.unam.mx/", target = "_blank"), style = "color: #6c757d; font-size: 14px; margin-top: -5px;")
+      p("Por Santiago Ríos - ", 
+        tags$a("Posgrado en Ciencias Biológicas, UNAM", 
+               href = "https://pcbiol.posgrado.unam.mx/", 
+               target = "_blank",
+               style = "color: #8e44ad; text-decoration: none; font-weight: 500;"), 
+        style = "color: #6c757d; font-size: 14px; margin-top: -5px;")
     )
   ),
   sidebarLayout(
     sidebarPanel(
-      h4("Fuente de datos"),
+      h4("Fuente de datos", style = "color: #7b1fa2; font-weight: 600;"),
       radioButtons(
         "data_source", "Seleccione una fuente:", inline = TRUE,
         choices = c("Subir archivos CSV" = "upload", "Generar datos de ejemplo" = "random"),
@@ -38,13 +67,17 @@ ui <- fluidPage(
         # Dynamic UI to map columns when a file is uploaded
         uiOutput("column_mapper_ui"),
         fluidRow(
-          column(6, actionButton("open_group_editor", "Editar grupos (opcional)", class = "btn-sm btn-outline-secondary")),
-          column(6, actionButton("clear_uploaded", "Limpiar datos cargados", class = "btn-sm btn-danger"))
+          column(6, actionButton("open_group_editor", "Editar grupos (opcional)", 
+                                class = "btn-sm", 
+                                style = "background-color: #e1bee7; color: #4a148c; border: 1px solid #ba68c8;")),
+          column(6, actionButton("clear_uploaded", "Limpiar datos cargados", 
+                                class = "btn-sm", 
+                                style = "background-color: #ffcdd2; color: #c62828; border: 1px solid #e57373;"))
         ),
         tags$small(textOutput("upload_status")),
         tags$hr(),
         tags$div(
-          h5("Cómo cargar y comparar grupos"),
+          h5("Cómo cargar y comparar grupos", style = "color: #8e44ad; font-weight: 600;"),
           tags$ul(
             tags$li("Sube los datos de coordenadas de un grupo (p. ej., carpeta 'Control') y selecciona las columnas que correspondan al tiempo y ejes `x` y `y` (campos obligatorios)."),
             tags$li("Haz click en el botón Analizar cuando hayas ajustado las coordenadas del laberinto. Los límites del laberinto NO influyen en la entropía, solo la localización del annulus y las coordenadas."),
@@ -56,7 +89,7 @@ ui <- fluidPage(
       ),
       conditionalPanel(
         condition = "input.data_source == 'random'",
-        h5("Simulación de Datos"),
+        h5("Simulación de Datos", style = "color: #8e44ad; font-weight: 600;"),
         p("Genera datos simulados con diferentes comportamientos de aprendizaje para explorar la aplicación y ver cómo cambian los valores de entropía"),
         fluidRow(
           column(8, 
@@ -64,8 +97,14 @@ ui <- fluidPage(
           ),
           column(4,
                  br(),
-                 actionButton("randomize_data", "Aleatorizar", icon = icon("dice"), 
-                            class = "btn-warning btn-sm", style = "margin-top: 5px;")
+                 actionButton("randomize_data", "🎲 Aleatorizar", icon = icon("dice"), 
+                            style = "margin-top: 5px; 
+                                   background: linear-gradient(135deg, #ff9800, #ff5722); 
+                                   color: white; 
+                                   border: none; 
+                                   padding: 6px 12px; 
+                                   border-radius: 15px; 
+                                   font-weight: 500;")
           )
         ),
   sliderInput("bias_control", "Aprendizaje Control (sesgo)", min = 0.002, max = 0.05, value = 0.015, step = 0.001),
@@ -82,11 +121,11 @@ ui <- fluidPage(
         )
       ),
       tags$hr(),
-      h4("Configuración de Arena"),
+      h4("Configuración de Arena", style = "color: #7b1fa2; font-weight: 600;"),
       checkboxInput("auto_detect", "Detectar automáticamente dimensiones", value = TRUE),
       conditionalPanel(
         condition = "input.auto_detect",
-        h5("Método de Detección de Plataforma:"),
+        h5("Método de Detección de Plataforma:", style = "color: #8e44ad; font-weight: 600;"),
         selectInput("platform_detection_method", "",
                    choices = c(
                      "Automático (recomendado)" = "auto",
@@ -111,7 +150,7 @@ ui <- fluidPage(
       ),
       conditionalPanel(
         condition = "!input.auto_detect",
-        h5("Parámetros Manuales:"),
+        h5("Parámetros Manuales:", style = "color: #8e44ad; font-weight: 600;"),
         numericInput("plat_x", "Coordenadas de plataforma en X", value = 117.8, step = 0.1),
         numericInput("plat_y", "Coordenadas de plataforma en Y", value = 38.4, step = 0.1),
         numericInput("wm_centr_x", "Centro en X del aparato", value = 90.13, step = 0.1),
@@ -120,8 +159,12 @@ ui <- fluidPage(
         tags$small("Los cambios manuales se aplican al presionar 'Actualizar vista previa'."),
         tags$br(),
         fluidRow(
-          column(6, actionButton("copy_detected", "Copiar parámetros detectados", class = "btn-sm btn-outline-secondary")),
-          column(6, actionButton("update_preview", "Actualizar vista previa", class = "btn-sm btn-primary"))
+          column(6, actionButton("copy_detected", "Copiar parámetros detectados", 
+                                class = "btn-sm", 
+                                style = "background-color: #e1bee7; color: #4a148c; border: 1px solid #ba68c8;")),
+          column(6, actionButton("update_preview", "Actualizar vista previa", 
+                                class = "btn-sm", 
+                                style = "background-color: #8e44ad; color: white; border: none;"))
         )
       ),
       conditionalPanel(
@@ -132,16 +175,37 @@ ui <- fluidPage(
       ),
       checkboxInput("click_set_platform", "Definir plataforma con clic en la vista previa", value = FALSE),
       tags$hr(),
-      h4("Opciones de Análisis"),
+      
+      # Botón Analizar prominente
+      div(style = "text-align: center; margin: 15px 0;",
+        actionButton("analyze_btn", "🔬 Analizar Datos", 
+                    class = "btn-lg", 
+                    style = "background: linear-gradient(135deg, #8e44ad, #9b59b6); 
+                           color: white; 
+                           border: none; 
+                           padding: 12px 30px; 
+                           font-weight: bold; 
+                           font-size: 16px;
+                           border-radius: 25px;
+                           box-shadow: 0 4px 15px rgba(142, 68, 173, 0.3);")
+      ),
+      tags$hr(),
+      
+      h4("Opciones de Análisis", style = "color: #7b1fa2; font-weight: 600;"),
       checkboxInput("normalize_entropy", "Normalizar entropía (recomendado para comparaciones)", value = TRUE),
       tags$small("La normalización hace que los valores sean comparables entre diferentes configuraciones experimentales."),
       tags$hr(),
-      actionButton("analyze_btn", "Analizar"),
-      tags$hr(),
       conditionalPanel(
         condition = "input.analyze_btn > 0",
-        downloadButton("download_entropy_plots", "Descargar Gráficos de Entropía", 
-                      class = "btn-primary btn-sm")
+        div(style = "text-align: center; margin-top: 15px;",
+          downloadButton("download_entropy_plots", "📊 Descargar Gráficos de Entropía", 
+                        style = "background: linear-gradient(135deg, #7b1fa2, #8e44ad); 
+                               color: white; 
+                               border: none; 
+                               padding: 8px 20px; 
+                               border-radius: 20px; 
+                               font-weight: 500;")
+        )
       )
     ),
     mainPanel(
@@ -376,18 +440,11 @@ ui <- fluidPage(
                  h4("Resumen de Entropía por Grupo"),
                  tableOutput("entropy_summary_table")
         ),
-        tabPanel("Entropía Agrupada", 
-                 h3("Trayectorias y Análisis de Entropía por Grupo"),
-                 fluidRow(
-                   column(6, 
-                          h4("Trayectorias por Grupo"),
-                          plotOutput("plot")
-                   ),
-                   column(6,
-                          h4("Distribución de Entropía"),
-                          plotOutput("entropy_barplot")
-                   )
-                 ),
+        tabPanel("Mapa de Calor", 
+                 h3("Mapa de Calor de Densidad Espacial"),
+                 plotOutput("heatmap"),
+                 
+                 tags$hr(),
                  h4("Valores de Entropía por Grupo"),
                  tableOutput("entropy_table"),
                  tags$br(),
@@ -396,21 +453,18 @@ ui <- fluidPage(
                  conditionalPanel(
                    condition = "input.normalize_entropy",
                    div(
-                     style = "background-color: #e8f4f8; padding: 10px; border-radius: 5px; margin-top: 10px;",
-                     tags$strong("Nota:"), " Los valores mostrados están normalizados. Los valores normalizados van de 0 a 1, donde 1 representa la máxima entropía posible para un área de exploración uniforme del laberinto."
+                     style = "background-color: #f8f4ff; padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #8e44ad;",
+                     tags$strong("📊 Nota sobre normalización:"), " Los valores mostrados están normalizados. Los valores normalizados van de 0 a 1, donde 1 representa la máxima entropía posible para un área de exploración uniforme del laberinto."
                    )
                  ),
                  
                  conditionalPanel(
                    condition = "!input.normalize_entropy",
                    div(
-                     style = "background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;",
-                     tags$strong("Nota:"), " Los valores mostrados son entropía sin normalizar. Para comparar entre diferentes configuraciones experimentales, se recomienda activar la normalización."
+                     style = "background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #f39c12;",
+                     tags$strong("⚠️ Nota:"), " Los valores mostrados son entropía sin normalizar. Para comparar entre diferentes configuraciones experimentales, se recomienda activar la normalización."
                    )
                  )
-        ),
-        tabPanel("Mapa de Calor", 
-                 plotOutput("heatmap")
         ),
   tabPanel("Estadísticas de Resumen", 
                  wellPanel(
@@ -532,10 +586,10 @@ server <- function(input, output, session) {
     new_data <- generate_group_trajectories(
       n_subjects_per_group = input$n_subjects_random,
       groups = c("Control", "Tratamiento"),
-      n_points = sample(80:150, 1),  # Random trajectory length
-  max_time = sample(30:60, 1),    # Random trial duration
-  drift_control = input$bias_control,
-  drift_treatment = input$bias_tratamiento
+      n_points = sample(80:150, 1),  # Random trajectory length per group
+      max_time = sample(30:60, 1),    # Random trial duration
+      drift_control = input$bias_control,
+      drift_treatment = input$bias_tratamiento
     )
     
     # Format data to match expected structure
@@ -550,9 +604,19 @@ server <- function(input, output, session) {
         time = as.numeric(time),
         x = as.numeric(x),
         y = as.numeric(y),
-        Group = Treatment  # Add Group column from Treatment
+        Group = Treatment,  # Add Group column from Treatment
+        # Ensure Individual column has character type and unique values
+        Individual = as.character(Individual)
       ) %>%
       dplyr::select(time, x, y, Individual, Group)  # Remove Treatment column to avoid confusion
+    
+    # Debug output to verify structure (only in development)
+    if (getOption("shiny.trace", FALSE)) {
+      cat("Generated data structure:\n")
+      cat("Columns:", paste(colnames(formatted_data), collapse = ", "), "\n")
+      cat("Unique individuals:", length(unique(formatted_data$Individual)), "\n")
+      cat("Groups:", paste(unique(formatted_data$Group), collapse = ", "), "\n")
+    }
     
     random_data(formatted_data)
     
@@ -564,7 +628,7 @@ server <- function(input, output, session) {
 
   getData <- reactive({
     # Check if random data is available and should be used
-    if (!is.null(random_data()) && is.null(input$file1$datapath)) {
+    if (input$data_source == "random" && !is.null(random_data())) {
       data <- random_data()
       # Apply group overrides even for random data
       overrides <- group_overrides()
@@ -574,7 +638,7 @@ server <- function(input, output, session) {
         data$Group <- ifelse(!is.na(repl), repl, data$Group)
       }
       return(data)
-    } else if (!is.null(input$file1$datapath)) {
+    } else if (input$data_source == "upload" && !is.null(input$file1$datapath)) {
       # Handle uploaded files with user-selected column mappings
       files <- input$file1$datapath
       if (is.null(files) || length(files) == 0) return(NULL)
@@ -1165,13 +1229,15 @@ server <- function(input, output, session) {
     # Show loading indicator for analysis
     showNotification("Analizando datos... Esto puede tomar unos segundos.", type = "message", duration = NULL, id = "analyzing")
     
-    # Debug: print data structure
-    cat("Estructura de los datos:\n")
-    cat("Columnas:", paste(colnames(data), collapse = ", "), "\n")
-    cat("Dimensiones:", dim(data), "\n")
-    if(nrow(data) > 0) {
-      cat("Primeras filas:\n")
-      print(head(data, 3))
+    # Debug: print data structure (only in development)
+    if (getOption("shiny.trace", FALSE)) {
+      cat("Estructura de los datos:\n")
+      cat("Columnas:", paste(colnames(data), collapse = ", "), "\n")
+      cat("Dimensiones:", dim(data), "\n")
+      if(nrow(data) > 0) {
+        cat("Primeras filas:\n")
+        print(head(data, 3))
+      }
     }
     
     # Check if data has required columns
