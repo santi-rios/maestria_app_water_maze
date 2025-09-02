@@ -85,6 +85,16 @@ ui <- fluidPage(
             tags$li("Use 'Editar grupos' para asignar/corregir el Grupo/Tratamiento por cada archivo csv si hace falta."),
             tags$li("El botón 'Analizar' usa todos los datos acumulados hasta el momento.")
           )
+        ),
+        tags$div(
+          style = "background-color: #f8f4ff; padding: 12px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #8e44ad;",
+          h6("📁 ¿No tienes datos? Descarga ejemplo validado:", style = "color: #4a148c; margin-bottom: 8px;"),
+          tags$a(
+            href = "https://raw.githubusercontent.com/santi-rios/maestria_app_water_maze/main/data/cooke2020_31-2_converted.csv",
+            download = "cooke2020_ejemplo.csv",
+            style = "color: #8e44ad; font-weight: bold; text-decoration: underline; font-size: 14px;",
+            "📥 Cooke et al. (2020) - 93 trayectorias científicas"
+          )
         )
       ),
       conditionalPanel(
@@ -429,6 +439,46 @@ ui <- fluidPage(
         ),
         tabPanel("Entropía Individual", 
                  h3("Análisis de Entropía por Individuo"),
+                 
+                 # Panel informativo para datos aleatorios
+                 conditionalPanel(
+                   condition = "input.data_source == 'random'",
+                   div(
+                     style = "background: linear-gradient(135deg, #f3e5f5, #e1bee7); 
+                              padding: 20px; 
+                              border-radius: 10px; 
+                              margin-bottom: 20px; 
+                              border-left: 5px solid #8e44ad;",
+                     h4("📋 Análisis Individual con Datos de Ejemplo", style = "color: #4a148c; margin-top: 0;"),
+                     p("Los análisis detallados por individuo están optimizados para datos reales cargados desde archivos CSV.", 
+                       style = "color: #4a148c; font-size: 16px;"),
+                     p(strong("Para explorar todas las funcionalidades:"), style = "color: #4a148c;"),
+                     tags$ul(style = "color: #4a148c;",
+                       tags$li("Descarga el conjunto de datos de ejemplo validado científicamente"),
+                       tags$li("Sube el archivo CSV usando la opción 'Subir archivos CSV'"),
+                       tags$li("Explora gráficos individuales, estadísticas detalladas y descargas PDF")
+                     ),
+                     div(style = "text-align: center; margin-top: 15px;",
+                       tags$a(
+                         href = "https://raw.githubusercontent.com/santi-rios/maestria_app_water_maze/main/data/cooke2020_31-2_converted.csv",
+                         download = "cooke2020_ejemplo.csv",
+                         class = "btn",
+                         style = "background: linear-gradient(135deg, #8e44ad, #9b59b6); 
+                                  color: white; 
+                                  padding: 12px 25px; 
+                                  border-radius: 25px; 
+                                  text-decoration: none; 
+                                  font-weight: bold;
+                                  border: none;
+                                  box-shadow: 0 4px 15px rgba(142, 68, 173, 0.3);",
+                         "📥 Descargar Datos de Ejemplo (Cooke et al., 2020)"
+                       )
+                     ),
+                     p(style = "font-size: 12px; color: #7b1fa2; text-align: center; margin-top: 10px;",
+                       "Archivo validado con 93 trayectorias individuales de referencia científica")
+                   )
+                 ),
+                 
                  p("Interpretación rápida:"),
                  tags$ul(
                    tags$li("Puntos y trazas: la trayectoria del individuo."),
@@ -467,6 +517,27 @@ ui <- fluidPage(
                  )
         ),
   tabPanel("Estadísticas de Resumen", 
+                 
+                 # Panel informativo para datos aleatorios
+                 conditionalPanel(
+                   condition = "input.data_source == 'random'",
+                   div(
+                     style = "background: linear-gradient(135deg, #e8f5e8, #c8e6c9); 
+                              padding: 15px; 
+                              border-radius: 8px; 
+                              margin-bottom: 15px; 
+                              border-left: 4px solid #27ae60;",
+                     h5("📊 Análisis Estadísticos Detallados", style = "color: #2e7d32; margin-top: 0;"),
+                     p("Los análisis estadísticos por individuo funcionan mejor con datos CSV reales. ", 
+                       tags$a(href = "https://raw.githubusercontent.com/santi-rios/maestria_app_water_maze/main/data/cooke2020_31-2_converted.csv",
+                              download = "cooke2020_ejemplo.csv",
+                              "Descarga datos de ejemplo aquí", 
+                              style = "color: #8e44ad; font-weight: bold; text-decoration: underline;"),
+                       " para análisis completos.",
+                       style = "color: #2e7d32; margin-bottom: 0;")
+                   )
+                 ),
+                 
                  wellPanel(
                    fluidRow(
                      column(4, selectInput("test_variable", "Variable a probar", choices = c("Entropía (entre grupos)"), selected = "Entropía (entre grupos)")),
@@ -1102,13 +1173,34 @@ server <- function(input, output, session) {
     
     # Check if results have the expected structure
     if (is.null(results$plots) || length(results$plots) == 0) {
-      return(div(
-        style = "text-align: center; padding: 20px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;",
-        icon("exclamation-triangle", style = "font-size: 48px; color: #856404; margin-bottom: 10px;"),
-        h4("Error al generar gráficos individuales", style = "color: #856404;"),
-        p("No se pudieron crear los gráficos individuales. Verifique que los datos tienen identificadores de individuos.", style = "color: #856404;"),
-        p("Intente cargar nuevos datos o generar datos aleatorios.", style = "color: #856404;")
-      ))
+      # Different message for random data vs uploaded data
+      if (input$data_source == "random") {
+        return(div(
+          style = "text-align: center; padding: 25px; background: linear-gradient(135deg, #f3e5f5, #e1bee7); border-radius: 10px; border-left: 5px solid #8e44ad;",
+          icon("chart-line", style = "font-size: 48px; color: #8e44ad; margin-bottom: 15px;"),
+          h4("Gráficos Individuales con Datos CSV", style = "color: #4a148c; margin-bottom: 15px;"),
+          p("Los gráficos individuales detallados están optimizados para datos reales cargados desde archivos CSV.", 
+            style = "color: #4a148c; font-size: 16px; margin-bottom: 15px;"),
+          div(style = "background-color: rgba(255,255,255,0.7); padding: 15px; border-radius: 8px; margin: 15px 0;",
+            p(strong("💡 Sugerencia:"), " Descarga el archivo de ejemplo científico y súbelo para ver el análisis completo:", 
+              style = "color: #4a148c; margin-bottom: 10px;"),
+            tags$a(
+              href = "https://raw.githubusercontent.com/santi-rios/maestria_app_water_maze/main/data/cooke2020_31-2_converted.csv",
+              download = "cooke2020_ejemplo.csv",
+              style = "color: #8e44ad; font-weight: bold; text-decoration: underline;",
+              "📥 Descargar datos de ejemplo (Cooke et al., 2020)"
+            )
+          )
+        ))
+      } else {
+        return(div(
+          style = "text-align: center; padding: 20px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px;",
+          icon("exclamation-triangle", style = "font-size: 48px; color: #856404; margin-bottom: 10px;"),
+          h4("Error al generar gráficos individuales", style = "color: #856404;"),
+          p("No se pudieron crear los gráficos individuales. Verifique que los datos tienen identificadores de individuos.", style = "color: #856404;"),
+          p("Intente cargar nuevos datos o verificar el formato CSV.", style = "color: #856404;")
+        ))
+      }
     }
 
     plots <- results$plots
